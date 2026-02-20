@@ -1,0 +1,92 @@
+{
+  "name": "opengravity",
+  "displayName": "OpenGravity",
+  "description": "AI Agent powered by OpenGravity",
+  "version": "0.0.1",
+  "publisher": "opengravity",
+  "icon": "opengravitylogo.png",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:opengravity.chatView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "opengravity-sidebar-panel",
+          "title": "OpenGravity",
+          "icon": "opengravitylogo.png"
+        }
+      ]
+    },
+    "views": {
+      "opengravity-sidebar-panel": [
+        {
+          "type": "webview",
+          "id": "opengravity.chatView",
+          "name": "Chat",
+          "icon": "opengravitylogo.png"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "opengravity.applyCode",
+        "title": "OpenGravity: Update Code"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "OpenGravity",
+      "properties": {
+        "opengravity.url": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "URL of the Ollama server"
+        },
+        "opengravity.model": {
+          "type": "string",
+          "default": "llama3",
+          "description": "Model to use for generation"
+        },
+        "opengravity.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "description": "Temperature for generation"
+        },
+        "opengravity.maxTokens": {
+          "type": "integer",
+          "default": -1,
+          "description": "Max tokens to generate (-1 for unlimited)"
+        },
+        "opengravity.enableAutocomplete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline ghost text autocomplete"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0"
+  }
+}

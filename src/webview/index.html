@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSP -->
+    <link href="${styleUri}" rel="stylesheet">
+    <title>OpenGravity</title>
+</head>
+
+<body>
+    <div id="header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="${logoUri}" alt="OpenGravity Logo" style="height: 24px; width: 24px; border-radius: 4px;">
+            <div class="title">OpenGravity</div>
+        </div>
+        <div id="model-controls">
+            <span id="model-memory" style="display:none; margin-right: 10px; font-size: 0.85em; color: #a0a0a0;"
+                title="Memory Usage"></span>
+            <select id="model-select" title="Select Model">
+                <option value="" disabled selected>Loading models...</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="chat-container">
+        <div id="messages">
+            <!-- Messages will be inserted here -->
+        </div>
+
+        <div id="input-area">
+            <div id="image-preview"></div>
+            <textarea id="prompt-input" rows="1" placeholder="Ask OpenGravity..."></textarea>
+            <div id="input-controls">
+                <div class="left-controls">
+                    <!-- Future: Attach icons -->
+                </div>
+                <button id="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+    <script src="${scriptUri}"></script>
+</body>
+
+</html>
