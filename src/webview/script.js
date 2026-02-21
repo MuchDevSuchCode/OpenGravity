@@ -261,28 +261,44 @@ function formatMessage(text) {
         }
     }
 
-    // Simple formatting
-    let content = escapeHtml(cleanedText).replace(/\n/g, '<br>');
-
     // Check for code blocks before modifying content
     const hasCodeBlocks = /```([\s\S]*?)```/.test(cleanedText);
 
-    // Basic code block detection (very simple)
-    content = content.replace(/```([\s\S]*?)```/g, (match, code) => {
-        return `<pre><code>${code}</code></pre>`;
+    // Extract Plan Blocks to protect from markdown parser
+    const plans = [];
+    cleanedText = cleanedText.replace(/<plan>([\s\S]*?)<\/plan>/gi, (match, planContent) => {
+        plans.push(planContent);
+        return `%%%PLAN_${plans.length - 1}%%%`;
     });
 
-    // Plan block detection
-    content = content.replace(/&lt;plan&gt;([\s\S]*?)&lt;\/plan&gt;/gi, (match, planContent) => {
+    // Extract File Chips
+    const chips = [];
+    cleanedText = cleanedText.replace(/\[\[FILE_READ_CHIP:\s*(.+?)\]\]/g, (match, file) => {
+        chips.push(file);
+        return `%%%CHIP_${chips.length - 1}%%%`;
+    });
+
+    // Parse Markdown!
+    let content = typeof marked !== 'undefined' ? marked.parse(cleanedText) : cleanedText;
+
+    // Restore Plans
+    content = content.replace(/<p>%%%PLAN_(\d+)%%%<\/p>|%%%PLAN_(\d+)%%%/g, (match, p1, p2) => {
+        const index = p1 !== undefined ? p1 : p2;
+        const planContent = plans[index];
+        const parsedPlan = typeof marked !== 'undefined' ? marked.parse(planContent) : planContent;
         return `<div class="plan-block">
             <div class="plan-header">Implementation Plan</div>
-            <div class="plan-content">${planContent}</div>
+            <div class="plan-content">${parsedPlan}</div>
             <button class="approve-plan-btn" onclick="approvePlan(this)">Approve Plan</button>
         </div>`;
     });
 
-    // File Read Chips
-    content = content.replace(/\[\[FILE_READ_CHIP:\s*(.+?)\]\]/g, '<span class="file-chip">Read file: <code>$1</code></span>');
+    // Restore Chips
+    content = content.replace(/<p>%%%CHIP_(\d+)%%%<\/p>|%%%CHIP_(\d+)%%%/g, (match, p1, p2) => {
+        const index = p1 !== undefined ? p1 : p2;
+        const file = chips[index];
+        return `<span class="file-chip">Read file: <code>${file}</code></span>`;
+    });
 
     // Append a single Apply Code button if code blocks exist
     if (hasCodeBlocks) {

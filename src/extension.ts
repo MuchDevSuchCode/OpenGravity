@@ -136,6 +136,10 @@ class OllamaViewProvider implements vscode.WebviewViewProvider {
                 contextMsg += `\n\n<file_tree>\n${tree}\n</file_tree>`;
             }
 
+            // Get Custom System overrides
+            const config = vscode.workspace.getConfiguration('opengravity');
+            const customSystemPrompt = config.get<string>('systemPrompt', '');
+
             // Construct Prompt with System Instructions
             const systemPrompt = `You are "OpenGravity", an expert coding assistant acting as an agent within VS Code.
 Your goal is to be helpful, concise, and accurate and you must always use perfect grammar and spelling.
@@ -145,8 +149,16 @@ You have access to the user's OPEN FILES and the PROJECT STRUCTURE in the XML ta
 If you need to read the contents of a file that is in the <file_tree> but not in the <open_files>, you MUST request it by outputting the following exact syntax: [READ_FILE: path/to/file.ext]. The system will read the file and provide it to you so you can complete the answer.
 CRITICAL CONSTRAINT: For ANY complex instruction or code change, you MUST FIRST output an implementation plan wrapped entirely in <plan> ... </plan> tags!
 You are strongly FORBIDDEN from writing any markdown code blocks (\`\`\`) in your initial response! You must only output the plan. You will only be allowed to output actual code blocks AFTER the user responds with "I approve the exact plan...".
+
+FORMATTING REQUIREMENTS:
+- Use markdown to properly format all text.
+- Use bullet lists where appropriate to organize explanations.
+- Logically group code changes by file.
+- Clearly note the exact filename in bold BEFORE any code block (e.g., **path/to/filename.ts**).
+
 Use this context to answer questions about the codebase without needing the user to copy-paste code.
-Always answer the user's question directly.`;
+Always answer the user's question directly.
+${customSystemPrompt ? `\nUSER SPECIFIC INSTRUCTIONS:\n${customSystemPrompt}\n` : ''}`;
 
             const fullSystemContext = `${systemPrompt}\n${contextMsg}`;
 
@@ -259,6 +271,7 @@ Always answer the user's question directly.`;
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'script.js'));
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'style.css'));
         const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'opengravitylogo.png'));
+        const markedUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'marked.min.js'));
 
         const htmlPath = vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'index.html');
         let htmlContent = fs.readFileSync(htmlPath.fsPath, 'utf8');
@@ -267,6 +280,7 @@ Always answer the user's question directly.`;
         htmlContent = htmlContent.replace('${scriptUri}', scriptUri.toString());
         htmlContent = htmlContent.replace('${styleUri}', styleUri.toString());
         htmlContent = htmlContent.replace('${logoUri}', logoUri.toString());
+        htmlContent = htmlContent.replace('${markedUri}', markedUri.toString());
 
         // Add CSP
         const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; script-src ${webview.cspSource} 'unsafe-inline'; style-src ${webview.cspSource} 'unsafe-inline';">`;

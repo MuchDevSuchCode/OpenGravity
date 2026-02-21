@@ -2,8 +2,12 @@
   "name": "opengravity",
   "displayName": "OpenGravity",
   "description": "AI Agent powered by OpenGravity",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "opengravity",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opengravity/opengravity.git"
+  },
   "icon": "opengravitylogo.png",
   "engines": {
     "vscode": "^1.90.0"
@@ -13,8 +17,7 @@
     "Chat"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onView:opengravity.chatView"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -47,15 +50,29 @@
       "type": "object",
       "title": "OpenGravity",
       "properties": {
+        "opengravity.provider": {
+          "type": "string",
+          "enum": [
+            "ollama",
+            "lmstudio"
+          ],
+          "default": "ollama",
+          "description": "AI API Provider (Ollama or LM Studio)"
+        },
         "opengravity.url": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "URL of the Ollama server"
+          "description": "URL of the local server (Ollama: 11434, LM Studio: 1234)"
         },
         "opengravity.model": {
           "type": "string",
           "default": "llama3",
           "description": "Model to use for generation"
+        },
+        "opengravity.systemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Custom global instructions appended to the agent's absolute system prompt"
         },
         "opengravity.temperature": {
           "type": "number",
@@ -66,6 +83,21 @@
           "type": "integer",
           "default": -1,
           "description": "Max tokens to generate (-1 for unlimited)"
+        },
+        "opengravity.contextLength": {
+          "type": "integer",
+          "default": 8192,
+          "description": "Max Context Length (num_ctx), highly recommended to increase for codebase context"
+        },
+        "opengravity.topP": {
+          "type": "number",
+          "default": 0.5,
+          "description": "Nucleus Sampling (top_p). Lower values (0.5) limit vocabulary for more exact/deterministic coding answers."
+        },
+        "opengravity.topK": {
+          "type": "integer",
+          "default": 40,
+          "description": "Top-K Sampling (top_k). Restricts generation to the K most likely tokens."
         },
         "opengravity.enableAutocomplete": {
           "type": "boolean",
@@ -82,11 +114,14 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/vscode": "^1.90.0",
     "@types/node": "20.x",
+    "@types/vscode": "^1.90.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.56.0",
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "marked": "^17.0.3"
   }
 }

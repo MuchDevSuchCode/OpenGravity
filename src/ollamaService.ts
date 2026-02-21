@@ -5,24 +5,46 @@ export class OllamaService {
 
     public async chat(messages: { role: string, content: string, images?: string[] }[], onChunk: (text: string) => void, modelOverride?: string): Promise<any> {
         const config = vscode.workspace.getConfiguration('opengravity');
-        const url = config.get<string>('url', 'http://localhost:11434');
+        const provider = config.get<string>('provider', 'ollama');
+        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
         const model = modelOverride || config.get<string>('model', 'llama3');
         const temp = config.get<number>('temperature', 0.2);
         const maxTokens = config.get<number>('maxTokens', -1);
+        const numCtx = config.get<number>('contextLength', 8192);
+        const topP = config.get<number>('topP', 0.5);
+        const topK = config.get<number>('topK', 40);
 
-        const fullUrl = `${url.replace(/\/$/, '')}/api/chat`;
+        let fullUrl = '';
+        let body: any = {};
 
-        const body: any = {
-            model: model,
-            messages: messages,
-            stream: true,
-            options: {
-                temperature: temp
+        if (provider === 'lmstudio') {
+            fullUrl = `${url.replace(/\/$/, '')}/v1/chat/completions`;
+            body = {
+                model: model,
+                messages: messages,
+                stream: true,
+                temperature: temp,
+                top_p: topP
+            };
+            if (maxTokens !== -1) {
+                body.max_tokens = maxTokens;
             }
-        };
-
-        if (maxTokens !== -1) {
-            body.options.num_predict = maxTokens;
+        } else {
+            fullUrl = `${url.replace(/\/$/, '')}/api/chat`;
+            body = {
+                model: model,
+                messages: messages,
+                stream: true,
+                options: {
+                    temperature: temp,
+                    num_ctx: numCtx,
+                    top_p: topP,
+                    top_k: topK
+                }
+            };
+            if (maxTokens !== -1) {
+                body.options.num_predict = maxTokens;
+            }
         }
 
         try {
@@ -55,23 +77,39 @@ export class OllamaService {
 
                 for (const line of lines) {
                     if (!line.trim()) continue;
-                    try {
-                        const json = JSON.parse(line);
-                        // Ollama 'chat' endpoint returns 'message' object
-                        if (json.message && json.message.content) {
-                            onChunk(json.message.content);
+
+                    if (provider === 'lmstudio') {
+                        if (line.includes('[DONE]')) {
+                            return { done: true };
                         }
-                        if (json.done) {
-                            return json;
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const json = JSON.parse(line.slice(6));
+                                if (json.choices && json.choices[0].delta && json.choices[0].delta.content) {
+                                    onChunk(json.choices[0].delta.content);
+                                }
+                            } catch (e) { }
                         }
-                        if (json.error) {
-                            throw new Error(json.error);
+                    } else {
+                        try {
+                            const json = JSON.parse(line);
+                            // Ollama 'chat' endpoint returns 'message' object
+                            if (json.message && json.message.content) {
+                                onChunk(json.message.content);
+                            }
+                            if (json.done) {
+                                return json;
+                            }
+                            if (json.error) {
+                                throw new Error(json.error);
+                            }
+                        } catch (e) {
+                            // console.error('Error parsing JSON chunk', e);
                         }
-                    } catch (e) {
-                        // console.error('Error parsing JSON chunk', e);
                     }
                 }
             }
+            if (provider === 'lmstudio') return { done: true };
             return null;
         } catch (error: any) {
             if (error.name === 'AbortError') {
@@ -85,9 +123,31 @@ export class OllamaService {
 
     public async generate(prompt: string): Promise<string> {
         const config = vscode.workspace.getConfiguration('opengravity');
-        const url = config.get<string>('url', 'http://localhost:11434');
+        const provider = config.get<string>('provider', 'ollama');
+        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
         const model = config.get<string>('model', 'llama3');
         const temp = config.get<number>('temperature', 0.2);
+
+        if (provider === 'lmstudio') {
+            const fullUrl = `${url.replace(/\/$/, '')}/v1/chat/completions`;
+            const body = {
+                model: model,
+                messages: [{ role: 'user', content: prompt }],
+                stream: false,
+                temperature: temp,
+                max_tokens: 50
+            };
+            try {
+                const response = await fetch(fullUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) return '';
+                const json: any = await response.json();
+                return json.choices?.[0]?.message?.content || '';
+            } catch (e) { return ''; }
+        }
 
         const fullUrl = `${url.replace(/\/$/, '')}/api/generate`;
 
@@ -122,8 +182,12 @@ export class OllamaService {
 
     public async getModels(): Promise<string[]> {
         const config = vscode.workspace.getConfiguration('opengravity');
-        const url = config.get<string>('url', 'http://localhost:11434');
-        const fullUrl = `${url.replace(/\/$/, '')}/api/tags`;
+        const provider = config.get<string>('provider', 'ollama');
+        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
+
+        const fullUrl = provider === 'lmstudio'
+            ? `${url.replace(/\/$/, '')}/v1/models`
+            : `${url.replace(/\/$/, '')}/api/tags`;
 
         try {
             const response = await fetch(fullUrl);
@@ -131,16 +195,25 @@ export class OllamaService {
                 return [];
             }
             const json: any = await response.json();
+            if (provider === 'lmstudio') {
+                return json.data.map((m: any) => m.id);
+            }
             return json.models.map((m: any) => m.name);
         } catch (e) {
-            console.error('Ollama GetModels Error:', e);
+            console.error('GetModels Error:', e);
             return [];
         }
     }
 
     public async getActiveModels(): Promise<any[]> {
         const config = vscode.workspace.getConfiguration('opengravity');
-        const url = config.get<string>('url', 'http://localhost:11434');
+        const provider = config.get<string>('provider', 'ollama');
+        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
+
+        if (provider === 'lmstudio') {
+            return [];
+        }
+
         const fullUrl = `${url.replace(/\/$/, '')}/api/ps`;
 
         try {
