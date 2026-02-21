@@ -236,9 +236,12 @@ function formatMessage(text) {
     // Simple formatting
     let content = escapeHtml(cleanedText).replace(/\n/g, '<br>');
 
+    // Check for code blocks before modifying content
+    const hasCodeBlocks = /```([\s\S]*?)```/.test(cleanedText);
+
     // Basic code block detection (very simple)
     content = content.replace(/```([\s\S]*?)```/g, (match, code) => {
-        return `<pre><code>${code}</code><button class="insert-btn" onclick="applyCode(this)">Approve</button></pre>`;
+        return `<pre><code>${code}</code></pre>`;
     });
 
     // Plan block detection
@@ -251,7 +254,12 @@ function formatMessage(text) {
     });
 
     // File Read Chips
-    content = content.replace(/\[\[FILE_READ_CHIP:\s*(.+?)\]\]/g, '<div style="font-size: 0.85em; color: #88c0d0; margin-bottom: 8px;"><span style="opacity: 0.8">Read file: </span><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">$1</code></div>');
+    content = content.replace(/\[\[FILE_READ_CHIP:\s*(.+?)\]\]/g, '<span class="file-chip">Read file: <code>$1</code></span>');
+
+    // Append a single Apply Code button if code blocks exist
+    if (hasCodeBlocks) {
+        content += `<br><button class="apply-all-btn" onclick="applyAllCode(this)">Apply All Code Changes</button>`;
+    }
 
     return content;
 }
@@ -291,18 +299,26 @@ function removeLoadingIndicator() {
     }
 }
 
-// Global function for insert button
-window.applyCode = function (btn) {
-    const pre = btn.parentElement;
-    const code = pre.querySelector('code').innerText;
-    vscode.postMessage({
-        command: 'applyCode',
-        text: code
+// Global function for insert all code
+window.applyAllCode = function (btn) {
+    const messageContent = btn.parentElement;
+    const codeBlocks = messageContent.querySelectorAll('pre code');
+    let combinedCode = '';
+
+    codeBlocks.forEach(codeBlock => {
+        combinedCode += codeBlock.innerText + '\n\n';
     });
 
-    btn.innerText = "Approved!";
-    btn.style.backgroundColor = "#1e792e";
-    btn.disabled = true;
+    if (combinedCode.trim()) {
+        vscode.postMessage({
+            command: 'applyCode',
+            text: combinedCode.trim()
+        });
+
+        btn.innerText = "Applied All Changes!";
+        btn.style.backgroundColor = "#1e792e";
+        btn.disabled = true;
+    }
 };
 
 window.approvePlan = function (btn) {

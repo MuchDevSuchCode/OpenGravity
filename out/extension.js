@@ -113,10 +113,10 @@ You have access to the user's OPEN FILES and the PROJECT STRUCTURE in the XML ta
 <open_files> tags contain the contents of all files currently open in the editor.
 <file_tree> tags contain the project structure and hierarchy.
 If you need to read the contents of a file that is in the <file_tree> but not in the <open_files>, you MUST request it by outputting the following exact syntax: [READ_FILE: path/to/file.ext]. The system will read the file and provide it to you so you can complete the answer.
-If the user asks for a complex change, you MUST first output an implementation plan. Wrap your plan completely in <plan> ... </plan> tags. Do NOT wrap the plan tags inside a markdown code block. Do not write the actual code changes until the user approves the plan.
+CRITICAL CONSTRAINT: For ANY complex instruction or code change, you MUST FIRST output an implementation plan wrapped entirely in <plan> ... </plan> tags!
+You are strongly FORBIDDEN from writing any markdown code blocks (\`\`\`) in your initial response! You must only output the plan. You will only be allowed to output actual code blocks AFTER the user responds with "I approve the exact plan...".
 Use this context to answer questions about the codebase without needing the user to copy-paste code.
-Always answer the user's question directly.
-If you write code, put it in markdown code blocks.`;
+Always answer the user's question directly.`;
             const fullSystemContext = `${systemPrompt}\n${contextMsg}`;
             if (this._chatHistory.length === 0) {
                 this._chatHistory.push({
@@ -159,7 +159,7 @@ If you write code, put it in markdown code blocks.`;
                         }
                         catch (err) { }
                         readResults += `\nContents of ${filePath}:\n\`\`\`\n${fileContent}\n\`\`\`\n`;
-                        this._view?.webview.postMessage({ command: 'chatResponse', text: `\n\n[[FILE_READ_CHIP: ${filePath}]]\n\n` });
+                        this._view?.webview.postMessage({ command: 'chatResponse', text: ` [[FILE_READ_CHIP: ${filePath}]] ` });
                     }
                     this._chatHistory.push({
                         role: 'assistant',
