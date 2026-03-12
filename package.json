@@ -44,6 +44,10 @@
       {
         "command": "opengravity.applyCode",
         "title": "OpenGravity: Update Code"
+      },
+      {
+        "command": "opengravity.applyPreset",
+        "title": "OpenGravity: Apply Preset"
       }
     ],
     "configuration": {
@@ -68,7 +72,7 @@
         },
         "opengravity.model": {
           "type": "string",
-          "default": "llama3",
+          "default": "qwen2.5-coder:7b",
           "description": "Model to use for generation"
         },
         "opengravity.systemPrompt": {
@@ -78,28 +82,28 @@
         },
         "opengravity.temperature": {
           "type": "number",
-          "default": 0.2,
-          "description": "Temperature for generation"
+          "default": 0.15,
+          "description": "Sampling temperature. Lower is more deterministic for coding."
         },
         "opengravity.maxTokens": {
           "type": "integer",
-          "default": -1,
-          "description": "Max tokens to generate (-1 for unlimited)"
+          "default": 4096,
+          "description": "Maximum tokens generated for each chat turn."
         },
         "opengravity.contextLength": {
           "type": "integer",
-          "default": 8192,
-          "description": "Max Context Length (num_ctx), highly recommended to increase for codebase context"
+          "default": 16384,
+          "description": "Model context window for chat/tool use (Ollama num_ctx)."
         },
         "opengravity.topP": {
           "type": "number",
-          "default": 0.5,
-          "description": "Nucleus Sampling (top_p). Lower values (0.5) limit vocabulary for more exact/deterministic coding answers."
+          "default": 0.9,
+          "description": "Nucleus sampling (top_p)."
         },
         "opengravity.topK": {
           "type": "integer",
           "default": 40,
-          "description": "Top-K Sampling (top_k). Restricts generation to the K most likely tokens."
+          "description": "Top-K sampling (Ollama/OpenAI-compatible when supported)."
         },
         "opengravity.enableAutocomplete": {
           "type": "boolean",
@@ -135,6 +139,52 @@
           "type": "boolean",
           "default": true,
           "description": "Enable native function-calling when the selected local provider/model supports it"
+        },
+        "opengravity.repeatPenalty": {
+          "type": "number",
+          "default": 1.1,
+          "description": "Repeat penalty to reduce loops/repetition (primarily Ollama)."
+        },
+        "opengravity.presencePenalty": {
+          "type": "number",
+          "default": 0,
+          "description": "Presence penalty for OpenAI-compatible backends that support it."
+        },
+        "opengravity.frequencyPenalty": {
+          "type": "number",
+          "default": 0,
+          "description": "Frequency penalty for OpenAI-compatible backends that support it."
+        },
+        "opengravity.seed": {
+          "type": "integer",
+          "default": 42,
+          "description": "Seed for more reproducible generations. Set -1 to let backend choose randomness."
+        },
+        "opengravity.autocompleteContextLength": {
+          "type": "integer",
+          "default": 2000,
+          "description": "Characters of prefix context sent for inline completion."
+        },
+        "opengravity.autocompleteMaxTokens": {
+          "type": "integer",
+          "default": 128,
+          "description": "Maximum tokens generated for inline completion."
+        },
+        "opengravity.autocompleteDebounceMs": {
+          "type": "integer",
+          "default": 300,
+          "description": "Debounce delay for inline completion requests in milliseconds."
+        },
+        "opengravity.presetProfile": {
+          "type": "string",
+          "enum": [
+            "balanced",
+            "deterministic",
+            "fast",
+            "custom"
+          ],
+          "default": "balanced",
+          "description": "Named tuning preset. This is updated when you run OpenGravity: Apply Preset."
         }
       }
     }

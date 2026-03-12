@@ -12,7 +12,9 @@ class OllamaCompletionProvider {
         if (!config.get('enableAutocomplete', true)) {
             return [];
         }
-        // Debounce
+        const debounceMs = Math.max(50, config.get('autocompleteDebounceMs', 300));
+        const contextSize = Math.max(200, config.get('autocompleteContextLength', 2000));
+        const autocompleteMaxTokens = Math.max(16, config.get('autocompleteMaxTokens', 128));
         return new Promise((resolve) => {
             if (this._timer) {
                 clearTimeout(this._timer);
@@ -22,21 +24,18 @@ class OllamaCompletionProvider {
                     resolve([]);
                     return;
                 }
-                // Simple prompt: context before cursor
-                // Ideally we would use FIM (Fill-In-The-Middle) here
                 const textBefore = document.getText(new vscode.Range(new vscode.Position(0, 0), position));
-                // Limit context size to avoid huge prompts
-                const contextSize = 1000;
                 const prompt = textBefore.slice(-contextSize);
-                const completion = await this._ollamaService.generate(prompt);
+                const completion = await this._ollamaService.generate(prompt, {
+                    maxTokens: autocompleteMaxTokens
+                });
                 if (completion && !token.isCancellationRequested) {
-                    // Start range at position
                     resolve([new vscode.InlineCompletionItem(completion, new vscode.Range(position, position))]);
                 }
                 else {
                     resolve([]);
                 }
-            }, 500); // 500ms debounce
+            }, debounceMs);
         });
     }
 }

@@ -52,14 +52,40 @@ OpenGravity exposes advanced determinism properties natively inside VS Code sett
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `opengravity.provider` | AI API Provider (`ollama` or `lmstudio`). | `ollama` |
-| `opengravity.url` | URL of the local server. *(Ollama: `11434`, LM Studio: `1234`)* | `http://localhost:11434` |
-| `opengravity.model` | The ID of the model to use for chat and generation. | `llama3` |
-| `opengravity.contextLength` | Max Context Length (`num_ctx`). Increase heavily for deep codebase context! | `8192` |
-| `opengravity.topP` | Nucleus Sampling (`top_p`). Low values enforce highly deterministic coding logic. | `0.5` |
-| `opengravity.temperature` | Controls structural creativity. Lower is better for strict code. | `0.2` |
-| `opengravity.systemPrompt` | Inject custom absolute rules (e.g. *"Always use tabs, never spaces"*). | `""` |
+| `opengravity.provider` | Backend type (`ollama`, `lmstudio`, `llamacpp`, `openaiCompatible`). | `ollama` |
+| `opengravity.url` | Base URL for your local model server. | `http://localhost:11434` |
+| `opengravity.model` | Model ID used for chat + tools + completion. | `qwen2.5-coder:7b` |
+| `opengravity.presetProfile` | Active preset label (`balanced`, `deterministic`, `fast`, `custom`). | `balanced` |
+| `opengravity.contextLength` | Chat/tool context window (`num_ctx` on Ollama). | `16384` |
+| `opengravity.maxTokens` | Max generated tokens per chat turn. | `4096` |
+| `opengravity.temperature` | Sampling temperature. | `0.15` |
+| `opengravity.topP` | Nucleus sampling (`top_p`). | `0.9` |
+| `opengravity.topK` | Top-K sampling. | `40` |
+| `opengravity.repeatPenalty` | Repetition penalty (mainly Ollama). | `1.1` |
+| `opengravity.presencePenalty` | Presence penalty (OpenAI-compatible backends). | `0` |
+| `opengravity.frequencyPenalty` | Frequency penalty (OpenAI-compatible backends). | `0` |
+| `opengravity.seed` | Random seed (`-1` disables fixed seed). | `42` |
+| `opengravity.enableAutocomplete` | Enable inline ghost-text completion. | `true` |
+| `opengravity.autocompleteContextLength` | Prefix chars sent to autocomplete model. | `2000` |
+| `opengravity.autocompleteMaxTokens` | Max tokens returned by autocomplete. | `128` |
+| `opengravity.autocompleteDebounceMs` | Debounce delay for autocomplete requests. | `300` |
+| `opengravity.agentMaxSteps` | Max iterative tool-call steps per request. | `8` |
+| `opengravity.enableNativeToolCalling` | Use native function calling when model supports it. | `true` |
+| `opengravity.maxReadFileBytes` | Max payload returned by `read_file` tool. | `150000` |
+| `opengravity.enableTerminalTool` | Allow `run_terminal_command` tool. | `false` |
+| `opengravity.terminalCommandTimeoutMs` | Timeout for terminal tool calls. | `20000` |
+| `opengravity.includeHiddenFilesInList` | Include dotfiles in `list_files` output. | `false` |
+| `opengravity.systemPrompt` | Extra custom system rules appended to base prompt. | `""` |
 
+### Preset Profiles
+
+Run **OpenGravity: Apply Preset** from the Command Palette to instantly switch tuning:
+
+- `Balanced`: Best overall coding quality and reliability.
+- `Deterministic`: Most stable/reproducible outputs.
+- `Fast`: Lowest latency with shorter responses.
+
+Applying a preset updates all relevant generation settings (tokens, context, sampling, penalties, and autocomplete tuning).
 ## 🛠️ Installation & Setup
 
 1. Install [Ollama](https://ollama.com/) or [LM Studio](https://lmstudio.ai/).
@@ -105,3 +131,7 @@ If you want to install your local build manually:
    vsce package
    ```
 3. Install the generated `.vsix` from the Extensions panel (`...` → **Install from VSIX...**).
+
+
+
+

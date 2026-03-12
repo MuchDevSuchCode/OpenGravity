@@ -7,6 +7,69 @@ const fs = require("fs");
 const ollamaService_1 = require("./ollamaService");
 const completionProvider_1 = require("./completionProvider");
 const agentRuntime_1 = require("./agentRuntime");
+function getPresetValues(preset) {
+    switch (preset) {
+        case 'deterministic':
+            return {
+                presetProfile: 'deterministic',
+                temperature: 0.05,
+                topP: 0.7,
+                topK: 20,
+                repeatPenalty: 1.15,
+                presencePenalty: 0,
+                frequencyPenalty: 0,
+                seed: 42,
+                maxTokens: 4096,
+                contextLength: 16384,
+                agentMaxSteps: 8,
+                autocompleteContextLength: 2000,
+                autocompleteMaxTokens: 96,
+                autocompleteDebounceMs: 280
+            };
+        case 'fast':
+            return {
+                presetProfile: 'fast',
+                temperature: 0.2,
+                topP: 0.9,
+                topK: 40,
+                repeatPenalty: 1.05,
+                presencePenalty: 0,
+                frequencyPenalty: 0,
+                seed: -1,
+                maxTokens: 2048,
+                contextLength: 8192,
+                agentMaxSteps: 5,
+                autocompleteContextLength: 1200,
+                autocompleteMaxTokens: 64,
+                autocompleteDebounceMs: 180
+            };
+        case 'balanced':
+        default:
+            return {
+                presetProfile: 'balanced',
+                temperature: 0.15,
+                topP: 0.9,
+                topK: 40,
+                repeatPenalty: 1.1,
+                presencePenalty: 0,
+                frequencyPenalty: 0,
+                seed: 42,
+                maxTokens: 4096,
+                contextLength: 16384,
+                agentMaxSteps: 8,
+                autocompleteContextLength: 2000,
+                autocompleteMaxTokens: 128,
+                autocompleteDebounceMs: 300
+            };
+    }
+}
+async function applyPreset(preset) {
+    const config = vscode.workspace.getConfiguration('opengravity');
+    const values = getPresetValues(preset);
+    for (const [key, value] of Object.entries(values)) {
+        await config.update(key, value, vscode.ConfigurationTarget.Global);
+    }
+}
 function activate(context) {
     console.log('OpenGravity is now active!');
     const provider = new OllamaViewProvider(context.extensionUri);
@@ -96,6 +159,27 @@ function activate(context) {
                 }
             }
         }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('opengravity.applyPreset', async (presetArg) => {
+        let preset;
+        if (presetArg === 'balanced' || presetArg === 'deterministic' || presetArg === 'fast') {
+            preset = presetArg;
+        }
+        if (!preset) {
+            const picked = await vscode.window.showQuickPick([
+                { label: 'Balanced', description: 'Best overall quality/speed', value: 'balanced' },
+                { label: 'Deterministic', description: 'Highest stability, lowest randomness', value: 'deterministic' },
+                { label: 'Fast', description: 'Lower latency and shorter outputs', value: 'fast' }
+            ], {
+                placeHolder: 'Select OpenGravity preset'
+            });
+            preset = picked?.value;
+        }
+        if (!preset) {
+            return;
+        }
+        await applyPreset(preset);
+        vscode.window.showInformationMessage(`OpenGravity preset applied: ${preset}.`);
     }));
     const inlineProvider = vscode.languages.registerInlineCompletionItemProvider({ pattern: '**' }, new completionProvider_1.OllamaCompletionProvider());
     context.subscriptions.push(inlineProvider);

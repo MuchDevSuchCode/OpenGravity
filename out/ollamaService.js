@@ -10,59 +10,86 @@ class OllamaService {
         const config = vscode.workspace.getConfiguration('opengravity');
         const provider = config.get('provider', 'ollama');
         const url = config.get('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
-        const model = modelOverride || config.get('model', 'llama3');
-        const temp = config.get('temperature', 0.2);
-        const maxTokens = config.get('maxTokens', -1);
-        const numCtx = config.get('contextLength', 8192);
-        const topP = config.get('topP', 0.5);
+        const model = modelOverride || config.get('model', 'qwen2.5-coder:7b');
+        const temp = config.get('temperature', 0.15);
+        const maxTokens = config.get('maxTokens', 4096);
+        const numCtx = config.get('contextLength', 16384);
+        const topP = config.get('topP', 0.9);
         const topK = config.get('topK', 40);
+        const repeatPenalty = config.get('repeatPenalty', 1.1);
+        const presencePenalty = config.get('presencePenalty', 0);
+        const frequencyPenalty = config.get('frequencyPenalty', 0);
+        const seed = config.get('seed', 42);
         const openAiCompatible = provider === 'lmstudio' || provider === 'llamacpp' || provider === 'openaiCompatible';
-        return { provider, url, model, temp, maxTokens, numCtx, topP, topK, openAiCompatible };
+        return {
+            provider,
+            url,
+            model,
+            temp,
+            maxTokens,
+            numCtx,
+            topP,
+            topK,
+            repeatPenalty,
+            presencePenalty,
+            frequencyPenalty,
+            seed,
+            openAiCompatible
+        };
     }
     _buildChatRequest(messages, modelOverride, stream, tools) {
-        const { url, model, temp, maxTokens, numCtx, topP, topK, openAiCompatible } = this._getProviderConfig(modelOverride);
-        if (openAiCompatible) {
+        const cfg = this._getProviderConfig(modelOverride);
+        if (cfg.openAiCompatible) {
             const body = {
-                model,
+                model: cfg.model,
                 messages,
                 stream,
-                temperature: temp,
-                top_p: topP
+                temperature: cfg.temp,
+                top_p: cfg.topP,
+                frequency_penalty: cfg.frequencyPenalty,
+                presence_penalty: cfg.presencePenalty
             };
-            if (maxTokens !== -1) {
-                body.max_tokens = maxTokens;
+            if (cfg.maxTokens > 0) {
+                body.max_tokens = cfg.maxTokens;
+            }
+            if (cfg.seed >= 0) {
+                body.seed = cfg.seed;
             }
             if (tools && tools.length > 0) {
                 body.tools = tools;
                 body.tool_choice = 'auto';
             }
             return {
-                fullUrl: `${url.replace(/\/$/, '')}/v1/chat/completions`,
+                fullUrl: `${cfg.url.replace(/\/$/, '')}/v1/chat/completions`,
                 body,
-                openAiCompatible
+                openAiCompatible: cfg.openAiCompatible
             };
         }
         const body = {
-            model,
+            model: cfg.model,
             messages,
             stream,
             options: {
-                temperature: temp,
-                num_ctx: numCtx,
-                top_p: topP,
-                top_k: topK
+                temperature: cfg.temp,
+                num_ctx: cfg.numCtx,
+                top_p: cfg.topP,
+                top_k: cfg.topK,
+                repeat_penalty: cfg.repeatPenalty
             }
         };
-        if (maxTokens !== -1) {
-            body.options.num_predict = maxTokens;
+        if (cfg.maxTokens > 0) {
+            body.options.num_predict = cfg.maxTokens;
+        }
+        if (cfg.seed >= 0) {
+            body.options.seed = cfg.seed;
         }
         if (tools && tools.length > 0) {
             body.tools = tools;
         }
         return {
-            fullUrl: `${url.replace(/\/$/, '')}/api/chat`,
+            fullUrl: `${cfg.url.replace(/\/$/, '')}/api/chat`,
             body,
-            openAiCompatible
+            openAiCompatible: cfg.openAiCompatible
         };
     }
     async chat(messages, onChunk, modelOverride) {
@@ -216,22 +243,24 @@ class OllamaService {
         }
         return calls;
     }
-    async generate(prompt) {
-        const config = vscode.workspace.getConfiguration('opengravity');
-        const provider = config.get('provider', 'ollama');
-        const url = config.get('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
-        const model = config.get('model', 'llama3');
-        const temp = config.get('temperature', 0.2);
-        const openAiCompatible = provider === 'lmstudio' || provider === 'llamacpp' || provider === 'openaiCompatible';
-        if (openAiCompatible) {
-            const fullUrl = `${url.replace(/\/$/, '')}/v1/chat/completions`;
+    async generate(prompt, options) {
+        const cfg = this._getProviderConfig();
+        const maxTokens = options?.maxTokens ?? 128;
+        if (cfg.openAiCompatible) {
+            const fullUrl = `${cfg.url.replace(/\/$/, '')}/v1/chat/completions`;
             const body = {
-                model: model,
+                model: cfg.model,
                 messages: [{ role: 'user', content: prompt }],
                 stream: false,
-                temperature: temp,
-                max_tokens: 50
+                temperature: cfg.temp,
+                top_p: cfg.topP,
+                frequency_penalty: cfg.frequencyPenalty,
+                presence_penalty: cfg.presencePenalty,
+                max_tokens: maxTokens
             };
+            if (cfg.seed >= 0) {
+                body.seed = cfg.seed;
+            }
             try {
                 const response = await fetch(fullUrl, {
                     method: 'POST',
@@ -247,16 +276,23 @@ class OllamaService {
                 return '';
             }
         }
-        const fullUrl = `${url.replace(/\/$/, '')}/api/generate`;
+        const fullUrl = `${cfg.url.replace(/\/$/, '')}/api/generate`;
         const body = {
-            model: model,
-            prompt: prompt,
+            model: cfg.model,
+            prompt,
             stream: false,
             options: {
-                temperature: temp,
-                num_predict: 50
+                temperature: cfg.temp,
+                top_p: cfg.topP,
+                top_k: cfg.topK,
+                repeat_penalty: cfg.repeatPenalty,
+                num_ctx: cfg.numCtx,
+                num_predict: maxTokens
             }
         };
+        if (cfg.seed >= 0) {
+            body.options.seed = cfg.seed;
+        }
         try {
             const response = await fetch(fullUrl, {
                 method: 'POST',
