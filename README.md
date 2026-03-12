@@ -7,7 +7,7 @@
 
 ---
 
-OpenGravity is a premium, locally-hosted AI coding assistant tightly integrated into Visual Studio Code. Powered natively by [Ollama](https://ollama.com/) or [LM Studio](https://lmstudio.ai/), OpenGravity acts as an intelligent agent capable of deep codebase analysis, autonomous file discovery, structured implementation planning, and inline autocompletions.
+OpenGravity is a premium, locally-hosted AI coding assistant tightly integrated into Visual Studio Code. Powered natively by [Ollama](https://ollama.com/), [LM Studio](https://lmstudio.ai/), and [llama.cpp](https://github.com/ggerganov/llama.cpp), OpenGravity acts as an intelligent agent capable of deep codebase analysis, autonomous file discovery, structured implementation planning, and inline autocompletions.
 
 ## 🌟 Why OpenGravity?
 1. **No usage limits:** Generate as much code as you want.
@@ -40,7 +40,7 @@ Once you click **Approve Plan**, the agent generates strictly-formatted code blo
 
 ## ⚡ Additional Capabilities
 
-- **LM Studio & Ollama Support:** Seamleassly bridge between Ollama's native API and LM Studio's OpenAI-compatible `/v1/chat/completions` endpoints.
+- **Ollama, LM Studio, and llama.cpp Support:** Use Ollama native APIs, LM Studio OpenAI-compatible APIs, and llama.cpp in either OpenAI-compatible mode or native `/completion` mode.
 - **Inline Ghost Text:** Get lightning-fast, as-you-type code completion suggestions using your local models right inside the editor pane.
 - **Vision Model Support:** Drag and drop images into the chat to prompt advanced visually-aware models like `llava`.
 
@@ -53,7 +53,14 @@ OpenGravity exposes advanced determinism properties natively inside VS Code sett
 | Setting | Description | Default |
 | --- | --- | --- |
 | `opengravity.provider` | Backend type (`ollama`, `lmstudio`, `llamacpp`, `openaiCompatible`). | `ollama` |
-| `opengravity.url` | Base URL for your local model server. | `http://localhost:11434` |
+| `opengravity.url` | Legacy fallback base URL (kept for backwards compatibility). | `http://localhost:11434` |
+| `opengravity.ollamaUrl` | Ollama URL (default port `11434`). | `http://localhost:11434` |
+| `opengravity.lmstudioUrl` | LM Studio URL (default port `1234`). | `http://localhost:1234` |
+| `opengravity.llamacppUrl` | llama.cpp URL (default port `8080`). | `http://localhost:8080` |
+| `opengravity.openaiCompatibleUrl` | Generic OpenAI-compatible URL (common port `8000`). | `http://localhost:8000` |
+| `opengravity.llamacppApiMode` | `openaiCompat` or `native` mode for llama.cpp. | `openaiCompat` |
+| `opengravity.llamacppChatEndpoint` | llama.cpp chat endpoint in `openaiCompat` mode. | `/v1/chat/completions` |
+| `opengravity.llamacppCompletionEndpoint` | llama.cpp completion endpoint in `native` mode. | `/completion` |
 | `opengravity.model` | Model ID used for chat + tools + completion. | `qwen2.5-coder:7b` |
 | `opengravity.presetProfile` | Active preset label (`balanced`, `deterministic`, `fast`, `custom`). | `balanced` |
 | `opengravity.contextLength` | Chat/tool context window (`num_ctx` on Ollama). | `16384` |
@@ -88,7 +95,7 @@ Run **OpenGravity: Apply Preset** from the Command Palette to instantly switch t
 Applying a preset updates all relevant generation settings (tokens, context, sampling, penalties, and autocomplete tuning).
 ## 🛠️ Installation & Setup
 
-1. Install [Ollama](https://ollama.com/) or [LM Studio](https://lmstudio.ai/).
+1. Install [Ollama](https://ollama.com/), [LM Studio](https://lmstudio.ai/), or [llama.cpp](https://github.com/ggerganov/llama.cpp).
 2. Pull a coding-optimized model (e.g., `llama3`, `deepseek-coder-v2`, `qwen2.5-coder`):
    ```bash
    ollama run llama3
@@ -156,6 +163,9 @@ If you prefer a global command:
    ```bash
    vsce package
    ```
+
+
+
 
 
 

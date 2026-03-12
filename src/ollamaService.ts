@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 export type ChatMessage = {
@@ -26,13 +27,53 @@ type GenerateOptions = {
     maxTokens?: number;
 };
 
+type ProviderKind = 'ollama' | 'openaiCompat' | 'llamacppNative';
+
+type ProviderConfig = {
+    provider: string;
+    kind: ProviderKind;
+    baseUrl: string;
+    model: string;
+    temp: number;
+    maxTokens: number;
+    numCtx: number;
+    topP: number;
+    topK: number;
+    repeatPenalty: number;
+    presencePenalty: number;
+    frequencyPenalty: number;
+    seed: number;
+    llamaCppChatEndpoint: string;
+    llamaCppCompletionEndpoint: string;
+};
+
 export class OllamaService {
     private _abortController: AbortController = new AbortController();
 
-    private _getProviderConfig(modelOverride?: string) {
+    private _getProviderConfig(modelOverride?: string): ProviderConfig {
         const config = vscode.workspace.getConfiguration('opengravity');
         const provider = config.get<string>('provider', 'ollama');
-        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
+
+        const legacyUrl = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
+        const legacyUrlInspect = config.inspect<string>('url');
+        const legacyUrlSet = Boolean(
+            legacyUrlInspect?.globalValue !== undefined
+            || legacyUrlInspect?.workspaceValue !== undefined
+            || legacyUrlInspect?.workspaceFolderValue !== undefined
+        );
+
+        const providerUrls: Record<string, string> = {
+            ollama: config.get<string>('ollamaUrl', 'http://localhost:11434'),
+            lmstudio: config.get<string>('lmstudioUrl', 'http://localhost:1234'),
+            llamacpp: config.get<string>('llamacppUrl', 'http://localhost:8080'),
+            openaiCompatible: config.get<string>('openaiCompatibleUrl', 'http://localhost:8000')
+        };
+
+        let baseUrl = providerUrls[provider] || providerUrls.ollama;
+        if (legacyUrlSet && legacyUrl) {
+            baseUrl = legacyUrl;
+        }
+
         const model = modelOverride || config.get<string>('model', 'qwen2.5-coder:7b');
         const temp = config.get<number>('temperature', 0.15);
         const maxTokens = config.get<number>('maxTokens', 4096);
@@ -43,11 +84,22 @@ export class OllamaService {
         const presencePenalty = config.get<number>('presencePenalty', 0);
         const frequencyPenalty = config.get<number>('frequencyPenalty', 0);
         const seed = config.get<number>('seed', 42);
-        const openAiCompatible = provider === 'lmstudio' || provider === 'llamacpp' || provider === 'openaiCompatible';
+
+        const llamaCppApiMode = config.get<string>('llamacppApiMode', 'openaiCompat');
+        const llamaCppChatEndpoint = config.get<string>('llamacppChatEndpoint', '/v1/chat/completions');
+        const llamaCppCompletionEndpoint = config.get<string>('llamacppCompletionEndpoint', '/completion');
+
+        let kind: ProviderKind = 'ollama';
+        if (provider === 'lmstudio' || provider === 'openaiCompatible') {
+            kind = 'openaiCompat';
+        } else if (provider === 'llamacpp') {
+            kind = llamaCppApiMode === 'native' ? 'llamacppNative' : 'openaiCompat';
+        }
 
         return {
             provider,
-            url,
+            kind,
+            baseUrl,
             model,
             temp,
             maxTokens,
@@ -58,14 +110,48 @@ export class OllamaService {
             presencePenalty,
             frequencyPenalty,
             seed,
-            openAiCompatible
+            llamaCppChatEndpoint,
+            llamaCppCompletionEndpoint
         };
     }
 
-    private _buildChatRequest(messages: ChatMessage[], modelOverride: string | undefined, stream: boolean, tools?: ToolDefinition[]) {
+    private _normalizeEndpoint(baseUrl: string, endpoint: string): string {
+        const cleanBase = baseUrl.replace(/\/$/, '');
+        if (!endpoint) {
+            return cleanBase;
+        }
+        if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+            return endpoint;
+        }
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        return `${cleanBase}${cleanEndpoint}`;
+    }
+
+    private _messagesToPrompt(messages: ChatMessage[]): string {
+        const lines: string[] = [];
+        for (const message of messages) {
+            if (message.role === 'system') {
+                lines.push(`System: ${message.content}`);
+            } else if (message.role === 'user') {
+                lines.push(`User: ${message.content}`);
+            } else if (message.role === 'assistant') {
+                lines.push(`Assistant: ${message.content}`);
+            } else if (message.role === 'tool') {
+                lines.push(`Tool: ${message.content}`);
+            }
+        }
+        lines.push('Assistant:');
+        return lines.join('\n\n');
+    }
+
+    private _buildRequest(messages: ChatMessage[], modelOverride: string | undefined, stream: boolean, tools?: ToolDefinition[]) {
         const cfg = this._getProviderConfig(modelOverride);
 
-        if (cfg.openAiCompatible) {
+        if (cfg.kind === 'openaiCompat') {
+            const endpoint = cfg.provider === 'llamacpp'
+                ? this._normalizeEndpoint(cfg.baseUrl, cfg.llamaCppChatEndpoint)
+                : this._normalizeEndpoint(cfg.baseUrl, '/v1/chat/completions');
+
             const body: any = {
                 model: cfg.model,
                 messages,
@@ -85,13 +171,38 @@ export class OllamaService {
                 body.tools = tools;
                 body.tool_choice = 'auto';
             }
+
             return {
-                fullUrl: `${cfg.url.replace(/\/$/, '')}/v1/chat/completions`,
-                body,
-                openAiCompatible: cfg.openAiCompatible
+                cfg,
+                endpoint,
+                body
             };
         }
 
+        if (cfg.kind === 'llamacppNative') {
+            const endpoint = this._normalizeEndpoint(cfg.baseUrl, cfg.llamaCppCompletionEndpoint);
+            const body: any = {
+                prompt: this._messagesToPrompt(messages),
+                stream,
+                temperature: cfg.temp,
+                top_p: cfg.topP,
+                top_k: cfg.topK,
+                repeat_penalty: cfg.repeatPenalty
+            };
+            if (cfg.maxTokens > 0) {
+                body.n_predict = cfg.maxTokens;
+            }
+            if (cfg.seed >= 0) {
+                body.seed = cfg.seed;
+            }
+            return {
+                cfg,
+                endpoint,
+                body
+            };
+        }
+
+        const endpoint = this._normalizeEndpoint(cfg.baseUrl, '/api/chat');
         const body: any = {
             model: cfg.model,
             messages,
@@ -115,21 +226,19 @@ export class OllamaService {
         }
 
         return {
-            fullUrl: `${cfg.url.replace(/\/$/, '')}/api/chat`,
-            body,
-            openAiCompatible: cfg.openAiCompatible
+            cfg,
+            endpoint,
+            body
         };
     }
 
     public async chat(messages: ChatMessage[], onChunk: (text: string) => void, modelOverride?: string): Promise<any> {
-        const request = this._buildChatRequest(messages, modelOverride, true);
+        const request = this._buildRequest(messages, modelOverride, true);
 
         try {
-            const response = await fetch(request.fullUrl, {
+            const response = await fetch(request.endpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(request.body),
                 signal: this._abortController.signal
             });
@@ -137,7 +246,6 @@ export class OllamaService {
             if (!response.ok) {
                 throw new Error(`Local API Error: ${response.status} ${response.statusText}`);
             }
-
             if (!response.body) {
                 throw new Error('No response body');
             }
@@ -155,40 +263,31 @@ export class OllamaService {
                 for (const line of lines) {
                     if (!line.trim()) continue;
 
-                    if (request.openAiCompatible) {
-                        if (line.includes('[DONE]')) {
-                            return { done: true };
+                    const raw = line.startsWith('data: ') ? line.slice(6) : line;
+                    if (raw === '[DONE]') {
+                        return { done: true };
+                    }
+
+                    try {
+                        const json: any = JSON.parse(raw);
+                        const openAiDelta = json.choices?.[0]?.delta?.content;
+                        const llamaNativeDelta = json.content;
+                        const ollamaDelta = json.message?.content;
+                        const text = openAiDelta || llamaNativeDelta || ollamaDelta;
+                        if (text) {
+                            onChunk(text);
                         }
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const json = JSON.parse(line.slice(6));
-                                if (json.choices && json.choices[0].delta && json.choices[0].delta.content) {
-                                    onChunk(json.choices[0].delta.content);
-                                }
-                            } catch {
-                                // Ignore malformed chunks while streaming.
-                            }
+
+                        if (json.done === true || json.stop === true) {
+                            return json;
                         }
-                    } else {
-                        try {
-                            const json = JSON.parse(line);
-                            if (json.message && json.message.content) {
-                                onChunk(json.message.content);
-                            }
-                            if (json.done) {
-                                return json;
-                            }
-                            if (json.error) {
-                                throw new Error(json.error);
-                            }
-                        } catch {
-                            // Ignore malformed chunks while streaming.
-                        }
+                    } catch {
+                        // Ignore malformed chunks while streaming.
                     }
                 }
             }
-            if (request.openAiCompatible) return { done: true };
-            return null;
+
+            return { done: true };
         } catch (error: any) {
             if (error.name === 'AbortError') {
                 return { aborted: true };
@@ -204,10 +303,10 @@ export class OllamaService {
         modelOverride?: string,
         tools?: ToolDefinition[]
     ): Promise<{ text: string; raw?: any; aborted?: boolean; assistantMessage?: ChatMessage; toolCalls?: ParsedToolCall[] }> {
-        const request = this._buildChatRequest(messages, modelOverride, false, tools);
+        const request = this._buildRequest(messages, modelOverride, false, tools);
 
         try {
-            const response = await fetch(request.fullUrl, {
+            const response = await fetch(request.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(request.body),
@@ -219,7 +318,8 @@ export class OllamaService {
             }
 
             const json: any = await response.json();
-            if (request.openAiCompatible) {
+
+            if (request.cfg.kind === 'openaiCompat') {
                 const message = json.choices?.[0]?.message || {};
                 return {
                     text: message.content || '',
@@ -228,6 +328,18 @@ export class OllamaService {
                         role: message.role || 'assistant',
                         content: message.content || '',
                         tool_calls: message.tool_calls
+                    },
+                    raw: json
+                };
+            }
+
+            if (request.cfg.kind === 'llamacppNative') {
+                const text = json.content || json.response || '';
+                return {
+                    text,
+                    assistantMessage: {
+                        role: 'assistant',
+                        content: text
                     },
                     raw: json
                 };
@@ -289,8 +401,11 @@ export class OllamaService {
         const cfg = this._getProviderConfig();
         const maxTokens = options?.maxTokens ?? 128;
 
-        if (cfg.openAiCompatible) {
-            const fullUrl = `${cfg.url.replace(/\/$/, '')}/v1/chat/completions`;
+        if (cfg.kind === 'openaiCompat') {
+            const endpoint = cfg.provider === 'llamacpp'
+                ? this._normalizeEndpoint(cfg.baseUrl, cfg.llamaCppChatEndpoint)
+                : this._normalizeEndpoint(cfg.baseUrl, '/v1/chat/completions');
+
             const body: any = {
                 model: cfg.model,
                 messages: [{ role: 'user', content: prompt }],
@@ -304,8 +419,9 @@ export class OllamaService {
             if (cfg.seed >= 0) {
                 body.seed = cfg.seed;
             }
+
             try {
-                const response = await fetch(fullUrl, {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -318,8 +434,36 @@ export class OllamaService {
             }
         }
 
-        const fullUrl = `${cfg.url.replace(/\/$/, '')}/api/generate`;
+        if (cfg.kind === 'llamacppNative') {
+            const endpoint = this._normalizeEndpoint(cfg.baseUrl, cfg.llamaCppCompletionEndpoint);
+            const body: any = {
+                prompt,
+                stream: false,
+                temperature: cfg.temp,
+                top_p: cfg.topP,
+                top_k: cfg.topK,
+                repeat_penalty: cfg.repeatPenalty,
+                n_predict: maxTokens
+            };
+            if (cfg.seed >= 0) {
+                body.seed = cfg.seed;
+            }
 
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) return '';
+                const json: any = await response.json();
+                return json.content || json.response || '';
+            } catch {
+                return '';
+            }
+        }
+
+        const endpoint = this._normalizeEndpoint(cfg.baseUrl, '/api/generate');
         const body: any = {
             model: cfg.model,
             prompt,
@@ -338,7 +482,7 @@ export class OllamaService {
         }
 
         try {
-            const response = await fetch(fullUrl, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
@@ -357,25 +501,55 @@ export class OllamaService {
     }
 
     public async getModels(): Promise<string[]> {
-        const config = vscode.workspace.getConfiguration('opengravity');
-        const provider = config.get<string>('provider', 'ollama');
-        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
-        const openAiCompatible = provider === 'lmstudio' || provider === 'llamacpp' || provider === 'openaiCompatible';
-
-        const fullUrl = openAiCompatible
-            ? `${url.replace(/\/$/, '')}/v1/models`
-            : `${url.replace(/\/$/, '')}/api/tags`;
+        const cfg = this._getProviderConfig();
 
         try {
-            const response = await fetch(fullUrl);
+            if (cfg.kind === 'openaiCompat') {
+                const endpoint = this._normalizeEndpoint(cfg.baseUrl, '/v1/models');
+                const response = await fetch(endpoint);
+                if (!response.ok) {
+                    return [];
+                }
+                const json: any = await response.json();
+                return (json.data || []).map((m: any) => m.id).filter(Boolean);
+            }
+
+            if (cfg.kind === 'llamacppNative') {
+                const tryEndpoints = ['/models', '/props'];
+                for (const ep of tryEndpoints) {
+                    try {
+                        const response = await fetch(this._normalizeEndpoint(cfg.baseUrl, ep));
+                        if (!response.ok) {
+                            continue;
+                        }
+                        const json: any = await response.json();
+
+                        if (Array.isArray(json.models)) {
+                            const models = json.models.map((m: any) => m.id || m.name).filter(Boolean);
+                            if (models.length > 0) return models;
+                        }
+
+                        if (Array.isArray(json.data)) {
+                            const models = json.data.map((m: any) => m.id || m.name).filter(Boolean);
+                            if (models.length > 0) return models;
+                        }
+
+                        if (typeof json.model_path === 'string' && json.model_path) {
+                            return [path.basename(json.model_path)];
+                        }
+                    } catch {
+                        // Try next endpoint.
+                    }
+                }
+                return [];
+            }
+
+            const response = await fetch(this._normalizeEndpoint(cfg.baseUrl, '/api/tags'));
             if (!response.ok) {
                 return [];
             }
             const json: any = await response.json();
-            if (openAiCompatible) {
-                return (json.data || []).map((m: any) => m.id);
-            }
-            return (json.models || []).map((m: any) => m.name);
+            return (json.models || []).map((m: any) => m.name).filter(Boolean);
         } catch (e) {
             console.error('GetModels Error:', e);
             return [];
@@ -383,18 +557,15 @@ export class OllamaService {
     }
 
     public async getActiveModels(): Promise<any[]> {
-        const config = vscode.workspace.getConfiguration('opengravity');
-        const provider = config.get<string>('provider', 'ollama');
-        const url = config.get<string>('url', provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434');
-
-        if (provider !== 'ollama') {
+        const cfg = this._getProviderConfig();
+        if (cfg.provider !== 'ollama') {
             return [];
         }
 
-        const fullUrl = `${url.replace(/\/$/, '')}/api/ps`;
+        const endpoint = this._normalizeEndpoint(cfg.baseUrl, '/api/ps');
 
         try {
-            const response = await fetch(fullUrl);
+            const response = await fetch(endpoint);
             if (!response.ok) {
                 return [];
             }

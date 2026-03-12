@@ -261,7 +261,7 @@ class OllamaViewProvider implements vscode.WebviewViewProvider {
                             const config = vscode.workspace.getConfiguration('opengravity');
                             this._view?.webview.postMessage({
                                 command: 'settings',
-                                model: config.get<string>('model', 'llama3')
+                                model: config.get<string>('model', 'qwen2.5-coder:7b')
                             });
                         }
                         break;
@@ -395,5 +395,6 @@ ${customSystemPrompt ? `\nUser custom instructions:\n${customSystemPrompt}` : ''
         return htmlContent;
     }
 }
+
 
 

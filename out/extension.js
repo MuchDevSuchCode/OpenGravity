@@ -227,7 +227,7 @@ class OllamaViewProvider {
                         const config = vscode.workspace.getConfiguration('opengravity');
                         this._view?.webview.postMessage({
                             command: 'settings',
-                            model: config.get('model', 'llama3')
+                            model: config.get('model', 'qwen2.5-coder:7b')
                         });
                     }
                     break;

@@ -68,7 +68,7 @@
         "opengravity.url": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "URL of the local server (Ollama: 11434, LM Studio: 1234)"
+          "description": "Legacy fallback base URL. Prefer provider-specific URL settings below."
         },
         "opengravity.model": {
           "type": "string",
@@ -185,6 +185,45 @@
           ],
           "default": "balanced",
           "description": "Named tuning preset. This is updated when you run OpenGravity: Apply Preset."
+        },
+        "opengravity.ollamaUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama server URL (default port 11434)."
+        },
+        "opengravity.lmstudioUrl": {
+          "type": "string",
+          "default": "http://localhost:1234",
+          "description": "LM Studio server URL (default port 1234)."
+        },
+        "opengravity.llamacppUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "llama.cpp server URL (default port 8080)."
+        },
+        "opengravity.openaiCompatibleUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Generic OpenAI-compatible local endpoint URL (common default port 8000)."
+        },
+        "opengravity.llamacppApiMode": {
+          "type": "string",
+          "enum": [
+            "openaiCompat",
+            "native"
+          ],
+          "default": "openaiCompat",
+          "description": "llama.cpp API mode: OpenAI-compatible chat endpoints or native /completion endpoints."
+        },
+        "opengravity.llamacppChatEndpoint": {
+          "type": "string",
+          "default": "/v1/chat/completions",
+          "description": "llama.cpp chat endpoint when API mode is openaiCompat."
+        },
+        "opengravity.llamacppCompletionEndpoint": {
+          "type": "string",
+          "default": "/completion",
+          "description": "llama.cpp completion endpoint when API mode is native."
         }
       }
     }
