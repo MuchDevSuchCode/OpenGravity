@@ -1,10 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output
+# Build output (tsc compiles to out/)
 out/
-dist/
-coverage/
 *.tsbuildinfo
 
 # VS Code extension packaging/testing
@@ -26,11 +24,10 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Editor settings
+# Editor/IDE
 .idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
+*.swp
+*.swo
+*~

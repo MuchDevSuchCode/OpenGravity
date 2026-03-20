@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenGravity — Local-First AI Coding Agent for VS Code</title>
+    <meta name="description" content="A powerful, 100% private AI coding assistant for VS Code. No cloud, no subscriptions, no limits. Powered by llama.cpp, Ollama, and LM Studio.">
+    <link rel="icon" type="image/png" href="../opengravitylogo.png">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0d0d0f;
+            --bg2:       #111114;
+            --bg3:       #16161a;
+            --border:    rgba(255,255,255,0.07);
+            --accent:    #0078d4;
+            --accent2:   #1a8fe3;
+            --glow:      rgba(0,120,212,0.35);
+            --text:      #e8e8e8;
+            --muted:     #888;
+            --dim:       #444;
+            --radius:    12px;
+            --sans:      'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 16px;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── Typography ── */
+        h1, h2, h3, h4 { line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+        h1 { font-size: clamp(2.4rem, 6vw, 4.2rem); }
+        h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); }
+        h3 { font-size: 1.2rem; font-weight: 600; }
+        p  { color: var(--muted); line-height: 1.75; }
+        a  { color: var(--accent2); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ── Layout ── */
+        .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+        section { padding: 100px 0; }
+
+        /* ── Nav ── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(13,13,15,0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-inner {
+            max-width: 1120px; margin: 0 auto; padding: 0 24px;
+            height: 60px; display: flex; align-items: center; gap: 16px;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 1rem; }
+        .nav-logo img { width: 65px; height: 65px; border-radius: 6px; }
+        .nav-links { display: flex; gap: 28px; margin-left: auto; }
+        .nav-links a { color: var(--muted); font-size: 0.9rem; font-weight: 500; transition: color 0.15s; }
+        .nav-links a:hover { color: var(--text); text-decoration: none; }
+        .nav-cta {
+            margin-left: 20px;
+            background: var(--accent); color: #fff;
+            padding: 7px 18px; border-radius: 6px;
+            font-size: 0.875rem; font-weight: 600;
+            transition: background 0.15s;
+        }
+        .nav-cta:hover { background: var(--accent2); text-decoration: none; }
+        @media (max-width: 640px) { .nav-links { display: none; } }
+
+        /* ── Hero ── */
+        #hero {
+            padding: 160px 0 100px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        #hero::before {
+            content: '';
+            position: absolute;
+            top: -200px; left: 50%; transform: translateX(-50%);
+            width: 900px; height: 600px;
+            background: radial-gradient(ellipse at center, rgba(0,120,212,0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(0,120,212,0.12); border: 1px solid rgba(0,120,212,0.3);
+            color: #5bb8ff; padding: 5px 14px; border-radius: 99px;
+            font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em;
+            text-transform: uppercase; margin-bottom: 28px;
+        }
+        .hero-badge span { width: 6px; height: 6px; border-radius: 50%; background: #5bb8ff; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+        #hero h1 { margin-bottom: 24px; }
+        #hero h1 em { font-style: normal; color: var(--accent2); }
+        .hero-sub {
+            font-size: clamp(1rem, 2.5vw, 1.2rem);
+            color: var(--muted); max-width: 580px; margin: 0 auto 40px;
+        }
+        .hero-actions { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+        .btn-primary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--accent); color: #fff;
+            padding: 13px 28px; border-radius: 8px;
+            font-size: 0.95rem; font-weight: 600;
+            transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+            box-shadow: 0 0 32px var(--glow);
+        }
+        .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); text-decoration: none; box-shadow: 0 0 48px var(--glow); }
+        .btn-secondary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,0.05); color: var(--text);
+            padding: 13px 28px; border-radius: 8px;
+            font-size: 0.95rem; font-weight: 600; border: 1px solid var(--border);
+            transition: background 0.15s, transform 0.1s;
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.09); transform: translateY(-1px); text-decoration: none; }
+        .hero-providers {
+            margin-top: 60px;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+            flex-wrap: wrap;
+        }
+        .hero-providers span { font-size: 0.78rem; color: var(--dim); margin-right: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+        .provider-chip {
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            color: var(--muted); padding: 5px 14px; border-radius: 99px;
+            font-size: 0.82rem; font-weight: 500;
+        }
+
+        /* ── Stat bar ── */
+        .stat-bar {
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg2);
+            padding: 0;
+        }
+        .stat-bar .container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .stat {
+            padding: 32px 24px;
+            text-align: center;
+            border-right: 1px solid var(--border);
+        }
+        .stat:last-child { border-right: none; }
+        .stat-num { font-size: 2rem; font-weight: 800; color: var(--text); letter-spacing: -0.03em; }
+        .stat-num span { color: var(--accent2); }
+        .stat-label { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+        @media (max-width: 640px) {
+            .stat-bar .container { grid-template-columns: repeat(2, 1fr); }
+            .stat:nth-child(2) { border-right: none; }
+            .stat:nth-child(3) { border-right: 1px solid var(--border); }
+        }
+
+        /* ── Screenshots ── */
+        #screenshots { background: var(--bg2); }
+        .section-label {
+            font-size: 0.78rem; color: var(--accent2); font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px;
+        }
+        .section-title { margin-bottom: 16px; }
+        .section-sub { max-width: 520px; margin-bottom: 56px; }
+        .screenshot-tabs {
+            display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--muted); padding: 7px 16px; border-radius: 6px;
+            font-size: 0.82rem; font-weight: 500; cursor: pointer;
+            transition: all 0.15s;
+        }
+        .tab-btn.active, .tab-btn:hover {
+            background: rgba(0,120,212,0.15); border-color: rgba(0,120,212,0.4);
+            color: #5bb8ff;
+        }
+        .screenshot-frame {
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+            position: relative;
+        }
+        .screenshot-frame img {
+            width: 100%; display: block;
+        }
+        .screenshot-panel { display: none; }
+        .screenshot-panel.active { display: block; }
+        .screenshot-caption {
+            margin-top: 20px; text-align: center;
+            font-size: 0.85rem; color: var(--muted);
+        }
+
+        /* ── Features ── */
+        #features { background: var(--bg); }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .feature-card {
+            background: var(--bg2);
+            padding: 32px 28px;
+            transition: background 0.15s;
+        }
+        .feature-card:hover { background: var(--bg3); }
+        .feature-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: rgba(0,120,212,0.12); border: 1px solid rgba(0,120,212,0.25);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; margin-bottom: 18px;
+        }
+        .feature-card h3 { margin-bottom: 10px; color: var(--text); }
+        .feature-card p { font-size: 0.9rem; }
+        @media (max-width: 900px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 580px) { .features-grid { grid-template-columns: 1fr; } }
+
+        /* ── How it works ── */
+        #how { background: var(--bg2); }
+        .steps {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 32px; margin-top: 56px;
+        }
+        .step { position: relative; }
+        .step-num {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(0,120,212,0.15); border: 1px solid rgba(0,120,212,0.35);
+            color: var(--accent2); font-size: 0.85rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 18px; flex-shrink: 0;
+        }
+        .step h3 { color: var(--text); margin-bottom: 10px; }
+        .step p { font-size: 0.9rem; }
+        .step-connector {
+            position: absolute; top: 18px; right: -16px;
+            width: 32px; height: 1px; background: var(--border);
+        }
+        .step:last-child .step-connector { display: none; }
+        @media (max-width: 760px) {
+            .steps { grid-template-columns: 1fr; }
+            .step-connector { display: none; }
+        }
+
+        /* ── Providers ── */
+        #providers { background: var(--bg); }
+        .providers-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+            margin-top: 56px;
+        }
+        .provider-card {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 28px 28px 28px 28px;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        .provider-card:hover { border-color: rgba(0,120,212,0.4); transform: translateY(-2px); }
+        .provider-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+        .provider-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+        .provider-card h3 { margin: 0; font-size: 1.05rem; }
+        .provider-card p { font-size: 0.88rem; margin-bottom: 16px; }
+        .code-block {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+            padding: 14px 16px; font-family: 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.78rem; color: #a8d8a8; line-height: 1.8;
+            overflow-x: auto;
+        }
+        .code-key { color: var(--muted); }
+        .code-val { color: #79c0ff; }
+        @media (max-width: 700px) { .providers-grid { grid-template-columns: 1fr; } }
+
+        /* ── Tools ── */
+        #tools { background: var(--bg2); }
+        .tools-table-wrap {
+            margin-top: 48px;
+            border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: rgba(255,255,255,0.03); }
+        th {
+            padding: 14px 20px; text-align: left;
+            font-size: 0.78rem; font-weight: 700; color: var(--muted);
+            letter-spacing: 0.05em; text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 14px 20px; font-size: 0.88rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            vertical-align: top;
+        }
+        tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+        .tool-name { font-family: monospace; color: #79c0ff; font-size: 0.85rem; }
+        td p { color: var(--muted); font-size: 0.88rem; margin: 0; line-height: 1.5; }
+        .badge-on { background: rgba(78,201,176,0.12); color: #4ec9b0; border: 1px solid rgba(78,201,176,0.25); padding: 2px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+        .badge-off { background: rgba(255,255,255,0.05); color: var(--dim); border: 1px solid var(--border); padding: 2px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+
+        /* ── Install ── */
+        #install { background: var(--bg); }
+        .install-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+            align-items: start; margin-top: 56px;
+        }
+        .install-steps { display: flex; flex-direction: column; gap: 20px; }
+        .install-step { display: flex; gap: 16px; }
+        .install-num {
+            width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+            background: var(--accent); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.78rem; font-weight: 700; margin-top: 2px;
+        }
+        .install-step h4 { color: var(--text); margin-bottom: 6px; font-size: 0.95rem; }
+        .install-step p { font-size: 0.88rem; }
+        .install-code {
+            background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .install-code-header {
+            padding: 10px 16px; border-bottom: 1px solid var(--border);
+            font-size: 0.75rem; color: var(--dim); font-family: monospace;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .install-code-header::before {
+            content: '';
+            width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+        }
+        .install-code pre {
+            padding: 20px; font-family: 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.8rem; color: #a8d8a8; line-height: 1.9; overflow-x: auto;
+        }
+        .install-code .comment { color: var(--dim); }
+        .install-code .key { color: var(--muted); }
+        .install-code .val { color: #79c0ff; }
+        @media (max-width: 760px) { .install-grid { grid-template-columns: 1fr; } }
+
+        /* ── Positioning ── */
+        .position-callout {
+            margin-top: 48px;
+            background: rgba(0,120,212,0.07); border: 1px solid rgba(0,120,212,0.2);
+            border-radius: var(--radius); padding: 24px 28px;
+            display: flex; gap: 16px; align-items: flex-start;
+        }
+        .position-callout .icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+        .position-callout h4 { color: var(--text); margin-bottom: 8px; font-size: 0.95rem; }
+        .position-callout p { font-size: 0.88rem; }
+        .position-callout ol { color: var(--muted); font-size: 0.88rem; padding-left: 18px; margin-top: 8px; line-height: 2; }
+
+        /* ── CTA ── */
+        #cta {
+            background: var(--bg2);
+            text-align: center;
+            position: relative; overflow: hidden;
+        }
+        #cta::before {
+            content: '';
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 800px; height: 400px;
+            background: radial-gradient(ellipse at top, rgba(0,120,212,0.12) 0%, transparent 65%);
+            pointer-events: none;
+        }
+        #cta h2 { margin-bottom: 20px; }
+        #cta p { max-width: 480px; margin: 0 auto 36px; }
+        .cta-actions { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+            padding: 40px 0;
+        }
+        .footer-inner {
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 16px;
+        }
+        .footer-logo { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.88rem; }
+        .footer-logo img { width: 55px; height: 55px; border-radius: 5px; opacity: 0.7; }
+        .footer-links { display: flex; gap: 24px; }
+        .footer-links a { font-size: 0.85rem; color: var(--dim); transition: color 0.15s; }
+        .footer-links a:hover { color: var(--muted); text-decoration: none; }
+        .footer-copy { font-size: 0.8rem; color: var(--dim); width: 100%; text-align: center; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+    <div class="nav-inner">
+        <a class="nav-logo" href="#">
+            OpenGravity
+        </a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#providers">Providers</a>
+            <a href="#tools">Tools</a>
+            <a href="#install">Install</a>
+        </div>
+        <a class="nav-cta" href="#install">Get Started →</a>
+    </div>
+</nav>
+
+<!-- ── HERO ── -->
+<section id="hero">
+    <div class="container">
+        <div class="hero-badge"><span></span> 100% Local &nbsp;·&nbsp; Zero Cloud &nbsp;·&nbsp; No Subscriptions &nbsp;·&nbsp; Open Source</div>
+        <h1>The AI Coding Agent<br>That Runs <em>On Your Machine</em></h1>
+        <p class="hero-sub">OpenGravity brings the intelligence of Copilot and Cursor to VS Code — powered entirely by your own hardware. No data leaves your machine. Ever.</p>
+        <div class="hero-actions">
+            <a class="btn-primary" href="#install">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download .vsix
+            </a>
+            <a class="btn-secondary" href="https://github.com/Open-Gravity/OpenGravity" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.37.6.1.82-.26.82-.57v-2c-3.34.72-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.75-1.33-1.75-1.08-.74.08-.72.08-.72 1.2.08 1.83 1.23 1.83 1.23 1.06 1.82 2.79 1.29 3.47.99.1-.77.41-1.3.75-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.04.13 3 .4 2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.68.82.57C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                View on GitHub
+            </a>
+        </div>
+        <div class="hero-providers">
+            <span>Powered by</span>
+            <span class="provider-chip">llama.cpp</span>
+            <span class="provider-chip">Ollama</span>
+            <span class="provider-chip">LM Studio</span>
+            <span class="provider-chip">OpenAI-Compatible</span>
+        </div>
+    </div>
+</section>
+
+<!-- ── STAT BAR ── -->
+<div class="stat-bar">
+    <div class="container">
+        <div class="stat"><div class="stat-num">0<span>¢</span></div><div class="stat-label">Per query, forever</div></div>
+        <div class="stat"><div class="stat-num">128<span>K+</span></div><div class="stat-label">Context window</div></div>
+        <div class="stat"><div class="stat-num">8<span>+</span></div><div class="stat-label">Agentic tools</div></div>
+        <div class="stat"><div class="stat-num">100<span>%</span></div><div class="stat-label">Private — offline capable</div></div>
+    </div>
+</div>
+
+<!-- ── SCREENSHOTS ── -->
+<section id="screenshots">
+    <div class="container">
+        <div class="section-label">In Action</div>
+        <h2 class="section-title">See It Work</h2>
+        <p class="section-sub">A polished, zero-clutter interface docked directly inside VS Code.</p>
+
+        <div class="screenshot-tabs">
+            <button class="tab-btn active" onclick="showTab(0)">Chat Interface</button>
+            <button class="tab-btn" onclick="showTab(1)">Context Gathering</button>
+            <button class="tab-btn" onclick="showTab(2)">Plan Mode</button>
+            <button class="tab-btn" onclick="showTab(3)">Code Application</button>
+        </div>
+
+        <div class="screenshot-panel active" id="tab-0">
+            <div class="screenshot-frame">
+                <img src="../screenshots/screen_shot_1.png" alt="OpenGravity Chat Interface">
+            </div>
+            <p class="screenshot-caption">Clean conversational interface with syntax-highlighted code blocks and one-click apply.</p>
+        </div>
+        <div class="screenshot-panel" id="tab-1">
+            <div class="screenshot-frame">
+                <img src="../screenshots/screen_shot_2.png" alt="Autonomous Context Gathering">
+            </div>
+            <p class="screenshot-caption">Automatically includes open files, cursor position, and selected text as context on every request.</p>
+        </div>
+        <div class="screenshot-panel" id="tab-2">
+            <div class="screenshot-frame">
+                <img src="../screenshots/screen_shot_3.png" alt="Implementation Plan Mode">
+            </div>
+            <p class="screenshot-caption">Plan mode produces a structured implementation plan before touching any code.</p>
+        </div>
+        <div class="screenshot-panel" id="tab-3">
+            <div class="screenshot-frame">
+                <img src="../screenshots/screen_shot_4.png" alt="One-Click Code Application">
+            </div>
+            <p class="screenshot-caption">Apply all code changes to disk with a single click — reliable for files of any size.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ── FEATURES ── -->
+<section id="features">
+    <div class="container">
+        <div class="section-label">Capabilities</div>
+        <h2 class="section-title">Everything You Need</h2>
+        <p class="section-sub">Built for serious development work — not demos.</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>Autonomous Agent</h3>
+                <p>Reads files, searches code, writes changes, and executes multi-step tasks without hand-holding. Up to 40 tool-call steps per request.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Total Privacy</h3>
+                <p>Zero data ever leaves your machine. No telemetry, no API keys, no cloud inference. Works fully offline on your own hardware.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Streaming Responses</h3>
+                <p>Tokens stream to the screen as they're generated. See the agent's thinking in real time — no more waiting for a full response.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Web Search & Fetch</h3>
+                <p>Search the web via Brave Search or self-hosted SearXNG, then fetch pages for full context. Docs, specs, GitHub files — all fair game.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📋</div>
+                <h3>Session Continuity</h3>
+                <p>Automatically writes PLAN.md at the end of every task. On the next session the agent reads it first — no context lost between conversations.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">✏️</div>
+                <h3>Inline Autocomplete</h3>
+                <p>Ghost-text completions as you type using your local model. Supports Fill-in-the-Middle (FIM) for Qwen, DeepSeek-Coder, CodeLlama, and StarCoder.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Smart Context</h3>
+                <p>Active editor gets priority budget. VS Code diagnostics, git branch, recent commits, and uncommitted diffs are injected automatically.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🗂️</div>
+                <h3>Persistent History</h3>
+                <p>Chat history survives VS Code restarts. When conversations grow large, older turns are automatically summarized to stay within context limits.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖥️</div>
+                <h3>Remote GPU Support</h3>
+                <p>Run llama.cpp on a powerful desktop or server and connect from any laptop. Up to 128K context (configurable) over the network with a single URL change.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── HOW IT WORKS ── -->
+<section id="how">
+    <div class="container">
+        <div class="section-label">Setup</div>
+        <h2 class="section-title">Up in Three Steps</h2>
+        <p class="section-sub">No accounts, no API keys, no cloud setup required.</p>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <h3>Start a Local Model</h3>
+                <p>Launch llama.cpp, Ollama, or LM Studio with any GGUF or compatible model. A coding-optimized model like Qwen2.5-Coder is recommended.</p>
+                <div class="step-connector"></div>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <h3>Install the Extension</h3>
+                <p>Download the .vsix and install via VS Code's Extension panel. Point OpenGravity at your server URL in settings — that's it.</p>
+                <div class="step-connector"></div>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <h3>Start Coding</h3>
+                <p>Open the panel, type your task, and let the agent work. It reads your code, makes changes, and explains everything as it goes.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── PROVIDERS ── -->
+<section id="providers">
+    <div class="container">
+        <div class="section-label">Backends</div>
+        <h2 class="section-title">Your Inference, Your Choice</h2>
+        <p class="section-sub">OpenGravity works with any local inference backend. Switch providers in settings with no restart required.</p>
+        <div class="providers-grid">
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-dot"></div>
+                    <h3>llama.cpp</h3>
+                </div>
+                <p>Native llama.cpp support — local or remote. Recommended for maximum performance. Context window is fully configurable (128K+ with Flash Attention).</p>
+                <div class="code-block">
+<span class="code-key">provider</span>    = <span class="code-val">llamacpp</span>
+<span class="code-key">llamacppUrl</span> = <span class="code-val">http://192.168.1.100:8080</span>
+<span class="code-key">apiMode</span>     = <span class="code-val">openaiCompat</span>
+<span class="code-key">model</span>       = <span class="code-val">""</span>  <span style="color:#444">← server picks loaded model</span>
+                </div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-dot"></div>
+                    <h3>Ollama</h3>
+                </div>
+                <p>Full native Ollama API support. Easiest setup for local development — install Ollama, pull a model, and go.</p>
+                <div class="code-block">
+<span class="code-key">provider</span>  = <span class="code-val">ollama</span>
+<span class="code-key">ollamaUrl</span> = <span class="code-val">http://localhost:11434</span>
+<span class="code-key">model</span>     = <span class="code-val">qwen2.5-coder:7b</span>
+                </div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-dot"></div>
+                    <h3>LM Studio</h3>
+                </div>
+                <p>OpenAI-compatible API from LM Studio. Great for users who prefer a GUI model manager with an easy model library.</p>
+                <div class="code-block">
+<span class="code-key">provider</span>     = <span class="code-val">lmstudio</span>
+<span class="code-key">lmstudioUrl</span>  = <span class="code-val">http://localhost:1234</span>
+                </div>
+            </div>
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-dot"></div>
+                    <h3>OpenAI-Compatible</h3>
+                </div>
+                <p>Any local server implementing the OpenAI chat completions API — vLLM, text-generation-webui, TabbyAPI, and more.</p>
+                <div class="code-block">
+<span class="code-key">provider</span>            = <span class="code-val">openaiCompatible</span>
+<span class="code-key">openaiCompatibleUrl</span> = <span class="code-val">http://localhost:8000</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── TOOLS ── -->
+<section id="tools">
+    <div class="container">
+        <div class="section-label">Agentic Tools</div>
+        <h2 class="section-title">What the Agent Can Do</h2>
+        <p class="section-sub">Every tool runs locally inside VS Code — sandboxed to your workspace.</p>
+        <div class="tools-table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tool</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><span class="tool-name">list_files</span></td><td><p>List files in the workspace or a subdirectory</p></td><td><span class="badge-on">Always On</span></td></tr>
+                    <tr><td><span class="tool-name">read_file</span></td><td><p>Read file content, optionally between line bounds</p></td><td><span class="badge-on">Always On</span></td></tr>
+                    <tr><td><span class="tool-name">search_in_files</span></td><td><p>Plain-text search across workspace files with glob filtering</p></td><td><span class="badge-on">Always On</span></td></tr>
+                    <tr><td><span class="tool-name">write_file</span></td><td><p>Create or overwrite a file — handles any size reliably</p></td><td><span class="badge-on">Always On</span></td></tr>
+                    <tr><td><span class="tool-name">replace_in_file</span></td><td><p>Surgical find-and-replace — first match or all occurrences</p></td><td><span class="badge-on">Always On</span></td></tr>
+                    <tr><td><span class="tool-name">apply_unified_diff</span></td><td><p>Apply a unified diff patch across one or more files in one step</p></td><td><span class="badge-on">Always On</span></td></tr>
+                    <tr><td><span class="tool-name">fetch_url</span></td><td><p>Fetch any http/https URL as plain text — docs, specs, GitHub raw files</p></td><td><span class="badge-on">On</span></td></tr>
+                    <tr><td><span class="tool-name">web_search</span></td><td><p>Search the web via Brave Search API or self-hosted SearXNG</p></td><td><span class="badge-off">Opt-in</span></td></tr>
+                    <tr><td><span class="tool-name">run_terminal_command</span></td><td><p>Run a shell command in the workspace root — confirmation required</p></td><td><span class="badge-off">Opt-in</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ── INSTALL ── -->
+<section id="install">
+    <div class="container">
+        <div class="section-label">Get Started</div>
+        <h2 class="section-title">Install in Minutes</h2>
+        <p class="section-sub">No account, no API key, no cloud setup. Just a local model and VS Code.</p>
+        <div class="install-grid">
+            <div class="install-steps">
+                <div class="install-step">
+                    <div class="install-num">1</div>
+                    <div>
+                        <h4>Start your inference server</h4>
+                        <p>Launch Ollama, llama.cpp, or LM Studio with a coding-optimized model.</p>
+                    </div>
+                </div>
+                <div class="install-step">
+                    <div class="install-num">2</div>
+                    <div>
+                        <h4>Install the .vsix</h4>
+                        <p>Open VS Code → Extensions (<code>Ctrl+Shift+X</code>) → <strong>···</strong> menu → <strong>Install from VSIX…</strong></p>
+                    </div>
+                </div>
+                <div class="install-step">
+                    <div class="install-num">3</div>
+                    <div>
+                        <h4>Set your provider URL</h4>
+                        <p>Click the ⚙ icon in the OpenGravity panel to open settings and point it at your server.</p>
+                    </div>
+                </div>
+                <div class="install-step">
+                    <div class="install-num">4</div>
+                    <div>
+                        <h4>Test the connection</h4>
+                        <p>Run <strong>OpenGravity: Test Connection</strong> from the Command Palette to confirm everything is working.</p>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="install-code">
+                    <div class="install-code-header">Ollama quick start</div>
+                    <pre><span class="comment"># Pull a coding model</span>
+ollama pull qwen2.5-coder:7b
+
+<span class="comment"># It starts automatically</span>
+<span class="comment"># Then in OpenGravity settings:</span>
+<span class="key">provider</span>  = <span class="val">ollama</span>
+<span class="key">ollamaUrl</span> = <span class="val">http://localhost:11434</span>
+<span class="key">model</span>     = <span class="val">qwen2.5-coder:7b</span></pre>
+                </div>
+                <div class="install-code" style="margin-top:16px;">
+                    <div class="install-code-header">llama.cpp remote server</div>
+                    <pre><span class="comment"># On your GPU machine:</span>
+llama-server -m model.gguf \
+  --host 0.0.0.0 --port 8080 \
+  -c 131072 -ngl 999 -fa 1
+
+<span class="comment"># In OpenGravity settings:</span>
+<span class="key">provider</span>    = <span class="val">llamacpp</span>
+<span class="key">llamacppUrl</span> = <span class="val">http://192.168.1.x:8080</span></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="position-callout">
+            <div class="icon">💡</div>
+            <div>
+                <h4>Move OpenGravity to the right side panel</h4>
+                <p>For the best experience, dock OpenGravity on the right so the file Explorer stays on the left.</p>
+                <ol>
+                    <li>Press <strong>Ctrl+Alt+B</strong> (Mac: <strong>Cmd+Option+B</strong>) to open the Secondary Side Bar on the right.</li>
+                    <li>Right-click the OpenGravity icon in the Activity Bar and select <strong>Move to Secondary Side Bar</strong> — or simply drag it across.</li>
+                    <li>OpenGravity now lives on the right, leaving your Explorer undisturbed.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── CTA ── -->
+<section id="cta">
+    <div class="container">
+        <h2>Your AI. Your Hardware.<br>Your Rules.</h2>
+        <p>Cancel your $20/month subscription. OpenGravity gives you the same intelligence — privately, locally, and for free.</p>
+        <div class="cta-actions">
+            <a class="btn-primary" href="#install">Download OpenGravity</a>
+            <a class="btn-secondary" href="https://github.com/Open-Gravity/OpenGravity" target="_blank">View Source</a>
+        </div>
+    </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+    <div class="container">
+        <div class="footer-inner">
+            <div class="footer-logo">
+                <img src="../opengravitylogo.png" alt="OpenGravity">
+                OpenGravity
+            </div>
+            <div class="footer-links">
+                <a href="#features">Features</a>
+                <a href="#install">Install</a>
+                <a href="https://github.com/Open-Gravity/OpenGravity" target="_blank">GitHub</a>
+                <a href="../LICENSE.md">License</a>
+            </div>
+        </div>
+        <p class="footer-copy">© 2026 OpenGravity. All rights reserved.</p>
+    </div>
+</footer>
+
+<script>
+    function showTab(index) {
+        document.querySelectorAll('.screenshot-panel').forEach((p, i) => {
+            p.classList.toggle('active', i === index);
+        });
+        document.querySelectorAll('.tab-btn').forEach((b, i) => {
+            b.classList.toggle('active', i === index);
+        });
+    }
+
+    // Smooth nav highlight on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a');
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(s => {
+            if (window.scrollY >= s.offsetTop - 80) { current = s.id; }
+        });
+        navLinks.forEach(a => {
+            a.style.color = a.getAttribute('href') === '#' + current ? 'var(--text)' : '';
+        });
+    });
+</script>
+</body>
+</html>

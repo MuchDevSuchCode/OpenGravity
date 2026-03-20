@@ -376,7 +376,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "package": "vsce package --out OpenGravity-Latest.vsix"
   },
   "devDependencies": {
     "@types/node": "20.x",
