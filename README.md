@@ -318,7 +318,14 @@ To enable web search:
 
 6. Run **OpenGravity: Test Connection** from the Command Palette to confirm everything is working.
 
-> **Tip:** If the sidebar doesn't appear automatically, press `Ctrl+Alt+B` (`Cmd+Option+B` on Mac) to toggle the Secondary Side Bar, then drag the OpenGravity logo from the Activity Bar into it.
+> **Moving OpenGravity to the right side panel (recommended):**
+> 1. Press `Ctrl+Alt+B` (`Cmd+Option+B` on Mac) to open the Secondary Side Bar on the right.
+> 2. In the Activity Bar (left icon strip), right-click the OpenGravity logo and select **Move to Secondary Side Bar**.
+>    — or —
+>    Drag the OpenGravity logo from the Activity Bar and drop it into the right panel.
+> 3. OpenGravity will now open on the right side, leaving the file Explorer on the left undisturbed.
+>
+> If the panel is still not visible, go to **View → Appearance → Secondary Side Bar** or press `Ctrl+Alt+B`.
 
 *For maximum performance, a GPU with at least 8GB VRAM is recommended. llama.cpp also runs fully on CPU.*
 
