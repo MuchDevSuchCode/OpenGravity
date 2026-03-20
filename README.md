@@ -134,6 +134,40 @@ All settings are in **Settings > Extensions > OpenGravity** and take effect imme
 
 ---
 
+### Recommended llama.cpp Server Configuration
+
+The `llama_default/` folder contains `start_server.sh` — the recommended launch script for running llama.cpp with OpenGravity. It is tuned for maximum context and agentic workloads on a capable local machine (tested on AMD Strix Halo / APU-class hardware).
+
+**Key settings:**
+
+| Flag | Value | Purpose |
+| --- | --- | --- |
+| `-c 131072` | 128K tokens | Full long-context window for deep agentic tasks |
+| `-np 1` | 1 parallel slot | Dedicates all memory to a single session — no sharing |
+| `-t / -tb 16` | 16 CPU threads | Full CPU utilization for prefill and generation |
+| `-ngl 999` | All layers to GPU | Maximizes inference speed via full GPU offload |
+| `-fa 1` | Flash Attention | Reduces VRAM usage significantly at large context |
+| `--no-mmap` | Disabled memory mapping | More stable on large models; avoids page faults |
+| `--metrics` | Prometheus endpoint | Enables `/metrics` for monitoring tokens/sec |
+
+The script also includes an **auto-organizer** that detects loose `.gguf` files in `~/models/`, groups them into named subfolders automatically, and presents an interactive model picker before launch.
+
+**To use it:**
+```bash
+# 1. Edit the variables at the top of the script
+LLAMA_SERVER="/path/to/llama-server"   # path to your compiled llama-server binary
+MODEL_DIR="$HOME/models"               # directory containing your .gguf files
+CPU_CORES="16"                         # match your CPU core count
+
+# 2. Make it executable and run
+chmod +x llama_default/start_server.sh
+./llama_default/start_server.sh
+```
+
+Then configure OpenGravity to point at `http://localhost:8080` (or your remote machine's IP) with `opengravity.provider = llamacpp`.
+
+---
+
 ### Provider Quick Start
 
 **llama.cpp (default)**
