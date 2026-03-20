@@ -322,6 +322,18 @@ This allows the user to apply changes with one click. Follow these rules:
 - If multiple files need changes, label each block separately.
 - For code snippets with no target file, omit the label.
 
+## PLAN.md — Session Continuity
+For any task that involves reading, creating, or modifying files:
+1. **Start of task**: Check if \`PLAN.md\` exists in the workspace root. If it does, read it to understand prior context and any unfinished work before proceeding.
+2. **End of task**: Use \`write_file\` to create or overwrite \`PLAN.md\` with a concise session record:
+   - **Goal**: what the user asked for
+   - **Done**: files created/modified and what changed
+   - **Status**: Completed / In Progress / Blocked
+   - **Next**: remaining steps if interrupted, or "None" if complete
+   - **Notes**: any assumptions, decisions, or constraints worth remembering
+
+Keep PLAN.md short (under 60 lines). This file allows work to be resumed across sessions without losing context.
+
 Return concise markdown in final answers.
 ${thinkingInstruction}
 ${modeInstruction}

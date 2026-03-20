@@ -478,7 +478,7 @@ pre {
 #attach-btn,
 #mode-select,
 #thinking-select {
-    background-color: transparent;
+    background-color: #2a2a2a;
     color: var(--text-secondary);
     border: 1px solid transparent;
     border-radius: 4px;
@@ -494,7 +494,7 @@ pre {
 #attach-btn:hover,
 #mode-select:hover,
 #thinking-select:hover {
-    background: rgba(255,255,255,0.07);
+    background: #333;
     color: var(--text-primary);
     border-color: var(--border-color);
 }
@@ -506,7 +506,16 @@ pre {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%23666'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 5px center;
+    background-color: #2a2a2a;
     padding-right: 16px;
+}
+
+/* Force dark background on native dropdown options (Chromium/Electron) */
+#mode-select option,
+#thinking-select option,
+#model-select option {
+    background-color: #2d2d2d;
+    color: #cccccc;
 }
 
 #mode-select { width: 82px; }
