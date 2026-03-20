@@ -91,11 +91,18 @@ Rules:
         const workingHistory: ChatMessage[] = [...publicHistory];
 
         for (let step = 0; step < maxSteps; step++) {
+            // Buffer streaming chunks — only forward to UI if this is the final response
+            // (no tool calls). This keeps the loading indicator visible during tool steps.
+            const chunkBuffer: string[] = [];
+            const bufferedOnChunk = this._callbacks.onChunk
+                ? (chunk: string) => chunkBuffer.push(chunk)
+                : undefined;
+
             const completion = await this._service.complete(
                 workingHistory,
                 input.modelOverride,
                 nativeToolCalling ? this._getToolDefinitions() : undefined,
-                this._callbacks.onChunk
+                bufferedOnChunk
             );
             if (completion.aborted) {
                 return {
@@ -111,6 +118,12 @@ Rules:
             const toolCalls = nativeCalls.length > 0 ? nativeCalls : (xmlCall ? [xmlCall] : []);
 
             if (toolCalls.length === 0) {
+                // Final response — flush buffered chunks to UI now
+                if (this._callbacks.onChunk) {
+                    for (const chunk of chunkBuffer) {
+                        this._callbacks.onChunk(chunk);
+                    }
+                }
                 return {
                     finalResponse: assistantText,
                     updatedHistory: [...publicHistory, { role: 'assistant', content: assistantText }],

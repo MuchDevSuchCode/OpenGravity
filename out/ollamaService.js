@@ -287,6 +287,24 @@ class OllamaService {
             body
         };
     }
+    async _fetchWithRetry(url, init, maxRetries = 1) {
+        let lastError;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await fetch(url, init);
+            }
+            catch (error) {
+                if (error.name === 'AbortError') {
+                    throw error;
+                }
+                lastError = error;
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                }
+            }
+        }
+        throw lastError;
+    }
     async _throwWithBody(response) {
         let detail = '';
         try {
@@ -305,7 +323,7 @@ class OllamaService {
     async chat(messages, onChunk, modelOverride) {
         const request = this._buildRequest(messages, modelOverride, true);
         try {
-            const response = await fetch(request.endpoint, {
+            const response = await this._fetchWithRetry(request.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(request.body),
@@ -383,7 +401,7 @@ class OllamaService {
         }
         const request = this._buildRequest(messages, modelOverride, false, tools);
         try {
-            const response = await fetch(request.endpoint, {
+            const response = await this._fetchWithRetry(request.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(request.body),
@@ -439,7 +457,7 @@ class OllamaService {
     async _completeStreaming(messages, modelOverride, tools, onChunk) {
         const request = this._buildRequest(messages, modelOverride, true, tools);
         try {
-            const response = await fetch(request.endpoint, {
+            const response = await this._fetchWithRetry(request.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(request.body),
@@ -641,7 +659,7 @@ class OllamaService {
                 body.seed = cfg.seed;
             }
             try {
-                const response = await fetch(endpoint, {
+                const response = await this._fetchWithRetry(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -670,7 +688,7 @@ class OllamaService {
                 body.seed = cfg.seed;
             }
             try {
-                const response = await fetch(endpoint, {
+                const response = await this._fetchWithRetry(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -702,7 +720,7 @@ class OllamaService {
             body.options.seed = cfg.seed;
         }
         try {
-            const response = await fetch(endpoint, {
+            const response = await this._fetchWithRetry(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
