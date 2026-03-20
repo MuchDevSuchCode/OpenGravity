@@ -21,7 +21,7 @@ function getPresetValues(preset) {
                 seed: 42,
                 maxTokens: 4096,
                 contextLength: 16384,
-                agentMaxSteps: 8,
+                agentMaxSteps: 25,
                 autocompleteContextLength: 2000,
                 autocompleteMaxTokens: 96,
                 autocompleteDebounceMs: 280
@@ -38,7 +38,7 @@ function getPresetValues(preset) {
                 seed: -1,
                 maxTokens: 2048,
                 contextLength: 8192,
-                agentMaxSteps: 5,
+                agentMaxSteps: 15,
                 autocompleteContextLength: 1200,
                 autocompleteMaxTokens: 64,
                 autocompleteDebounceMs: 180
@@ -56,7 +56,7 @@ function getPresetValues(preset) {
                 seed: 42,
                 maxTokens: 4096,
                 contextLength: 16384,
-                agentMaxSteps: 8,
+                agentMaxSteps: 25,
                 autocompleteContextLength: 2000,
                 autocompleteMaxTokens: 128,
                 autocompleteDebounceMs: 300
@@ -230,6 +230,19 @@ class OllamaViewProvider {
             ]
         };
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        // Push settings to webview whenever they change in VS Code settings
+        const configWatcher = vscode.workspace.onDidChangeConfiguration(e => {
+            if (!e.affectsConfiguration('opengravity'))
+                return;
+            const cfg = vscode.workspace.getConfiguration('opengravity');
+            this._view?.webview.postMessage({
+                command: 'settings',
+                model: cfg.get('model', ''),
+                thinkingLevel: cfg.get('thinkingLevel', 'medium'),
+                chatMode: cfg.get('chatMode', 'execute')
+            });
+        });
+        webviewView.onDidDispose(() => configWatcher.dispose());
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
                 case 'chat':

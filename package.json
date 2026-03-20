@@ -142,8 +142,9 @@
         },
         "opengravity.agentMaxSteps": {
           "type": "integer",
-          "default": 8,
-          "description": "Maximum tool-iteration steps per chat request",
+          "default": 25,
+          "minimum": 1,
+          "description": "Maximum tool-call steps the agent can take per request. Raise this freely — the only real limit is your model's context window. Complex multi-file tasks often need 20–40 steps.",
           "order": 49
         },
         "opengravity.maxReadFileBytes": {

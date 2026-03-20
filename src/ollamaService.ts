@@ -392,6 +392,21 @@ export class OllamaService {
         };
     }
 
+    private async _throwWithBody(response: Response): Promise<never> {
+        let detail = '';
+        try {
+            const body = await response.text();
+            const parsed = JSON.parse(body);
+            detail = parsed?.error?.message || parsed?.error || parsed?.message || body;
+        } catch {
+            // body wasn't JSON or was empty — ignore
+        }
+        const hint = response.status === 500
+            ? ' (llama.cpp returned 500 — likely context window exceeded or out of VRAM; try reducing contextLength or opening fewer files)'
+            : '';
+        throw new Error(`API error ${response.status}${detail ? `: ${detail}` : ` ${response.statusText}`}${hint}`);
+    }
+
     public async chat(messages: ChatMessage[], onChunk: (text: string) => void, modelOverride?: string): Promise<any> {
         const request = this._buildRequest(messages, modelOverride, true);
 
@@ -404,7 +419,7 @@ export class OllamaService {
             });
 
             if (!response.ok) {
-                throw new Error(`Local API Error: ${response.status} ${response.statusText}`);
+                await this._throwWithBody(response);
             }
             if (!response.body) {
                 throw new Error('No response body');
@@ -474,7 +489,7 @@ export class OllamaService {
             });
 
             if (!response.ok) {
-                throw new Error(`Local API Error: ${response.status} ${response.statusText}`);
+                await this._throwWithBody(response);
             }
 
             const json: any = await response.json();

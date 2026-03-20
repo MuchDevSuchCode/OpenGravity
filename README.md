@@ -105,7 +105,7 @@ OpenGravity exposes advanced settings natively inside VS Code. Access via **Sett
 
 | Setting | Description | Default |
 | --- | --- | --- |
-| `opengravity.agentMaxSteps` | Max tool-call iterations per request | `8` |
+| `opengravity.agentMaxSteps` | Max tool-call steps per request. Raise freely — only real limit is context window size. Complex tasks often need 20–40. | `25` |
 | `opengravity.enableNativeToolCalling` | Use native function calling when the model supports it | `true` |
 | `opengravity.maxReadFileBytes` | Max bytes returned by the `read_file` tool | `150000` |
 | `opengravity.enableTerminalTool` | Allow the agent to run terminal commands | `false` |
@@ -168,9 +168,9 @@ Run **OpenGravity: Apply Preset** from the Command Palette to instantly switch t
 
 | Preset | Temperature | Context | Max Tokens | Steps | Use Case |
 | --- | --- | --- | --- | --- | --- |
-| `Balanced` | 0.15 | 16384 | 4096 | 8 | Best overall quality/reliability |
-| `Deterministic` | 0.05 | 16384 | 4096 | 8 | Most stable, reproducible outputs |
-| `Fast` | 0.20 | 8192 | 2048 | 5 | Lowest latency, shorter responses |
+| `Balanced` | 0.15 | 16384 | 4096 | 25 | Best overall quality/reliability |
+| `Deterministic` | 0.05 | 16384 | 4096 | 25 | Most stable, reproducible outputs |
+| `Fast` | 0.20 | 8192 | 2048 | 15 | Lowest latency, shorter responses |
 
 Applying a preset updates all relevant generation settings at once — temperature, context length, token limits, penalties, seed, and autocomplete tuning.
 
