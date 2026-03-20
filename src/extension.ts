@@ -110,6 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         for (const change of payload) {
             if (!change.file || change.file.trim() === '') {
+                // No filename — open as untitled scratch document
                 const doc = await vscode.workspace.openTextDocument({ content: change.code });
                 await vscode.window.showTextDocument(doc, { preview: false });
                 continue;
@@ -120,53 +121,35 @@ export function activate(context: vscode.ExtensionContext) {
 
             if (workspaceFolders) {
                 const root = workspaceFolders[0].uri.fsPath;
-                if (path.isAbsolute(change.file)) {
-                    targetUri = vscode.Uri.file(change.file);
-                } else {
-                    targetUri = vscode.Uri.file(path.join(root, change.file));
-                }
+                targetUri = path.isAbsolute(change.file)
+                    ? vscode.Uri.file(change.file)
+                    : vscode.Uri.file(path.join(root, change.file));
             }
 
-            let editorToUse: vscode.TextEditor | undefined;
-            let isNewFile = false;
-
-            if (targetUri && fs.existsSync(targetUri.fsPath)) {
-                const doc = await vscode.workspace.openTextDocument(targetUri);
-                editorToUse = await vscode.window.showTextDocument(doc, { preview: false });
-            } else if (targetUri) {
+            if (targetUri) {
+                // Write via vscode.workspace.fs — handles arbitrarily large files
+                // without the editBuilder size limitations of the editor API.
                 try {
                     fs.mkdirSync(path.dirname(targetUri.fsPath), { recursive: true });
-                    fs.writeFileSync(targetUri.fsPath, '');
-                    const doc = await vscode.workspace.openTextDocument(targetUri);
-                    editorToUse = await vscode.window.showTextDocument(doc, { preview: false });
-                    isNewFile = true;
-                } catch (e) {
-                    editorToUse = vscode.window.activeTextEditor?.document.uri.scheme === 'file' ? vscode.window.activeTextEditor : lastActiveTextEditor;
-                }
+                } catch { /* dir may already exist */ }
+                const encoded = Buffer.from(change.code, 'utf8');
+                await vscode.workspace.fs.writeFile(targetUri, encoded);
+                const doc = await vscode.workspace.openTextDocument(targetUri);
+                await vscode.window.showTextDocument(doc, { preview: false });
             } else {
-                editorToUse = vscode.window.activeTextEditor?.document.uri.scheme === 'file' ? vscode.window.activeTextEditor : lastActiveTextEditor;
-            }
-
-            if (editorToUse) {
-                const document = editorToUse.document;
-                const success = await editorToUse.edit(editBuilder => {
-                    if (change.file || isNewFile) {
-                        const fullRange = new vscode.Range(
-                            document.positionAt(0),
-                            document.positionAt(document.getText().length)
-                        );
-                        editBuilder.replace(fullRange, change.code);
-                    } else {
-                        if (!editorToUse!.selection.isEmpty) {
-                            editBuilder.replace(editorToUse!.selection, change.code);
+                // No workspace — fall back to inserting into the active editor
+                const editor = vscode.window.activeTextEditor?.document.uri.scheme === 'file'
+                    ? vscode.window.activeTextEditor
+                    : lastActiveTextEditor;
+                if (editor) {
+                    await editor.edit(eb => {
+                        if (!editor.selection.isEmpty) {
+                            eb.replace(editor.selection, change.code);
                         } else {
-                            editBuilder.insert(editorToUse!.selection.active, change.code);
+                            eb.insert(editor.selection.active, change.code);
                         }
-                    }
-                });
-
-                if (success) {
-                    await editorToUse.document.save();
+                    });
+                    await editor.document.save();
                 }
             }
         }

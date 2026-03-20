@@ -586,7 +586,7 @@ window.copyCode = function (btn) {
     const wrapper = btn.closest('.code-block-wrapper');
     const code = wrapper ? wrapper.querySelector('code') : null;
     if (!code) return;
-    navigator.clipboard.writeText(code.innerText).then(() => {
+    navigator.clipboard.writeText(code.textContent || '').then(() => {
         btn.textContent = 'Copied!';
         btn.classList.add('copied');
         setTimeout(() => {
@@ -653,7 +653,9 @@ window.applyAllCode = function (btn) {
 
         const codeBlock = pre.querySelector('code');
         if (codeBlock) {
-            codeChanges.push({ file: filename, code: codeBlock.innerText });
+            // textContent is more reliable than innerText for large blocks —
+            // it reads raw text nodes without triggering layout or CSS evaluation.
+            codeChanges.push({ file: filename, code: codeBlock.textContent || '' });
         }
     });
 
