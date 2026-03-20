@@ -32,6 +32,19 @@ body {
     overflow: hidden;
 }
 
+/* System notices (e.g. history summarized) */
+.system-notice {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 12px;
+    margin: 4px 16px;
+    border-radius: 4px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    opacity: 0.75;
+}
+
 /* Scrollbars */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

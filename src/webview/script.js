@@ -102,6 +102,9 @@ window.addEventListener('message', event => {
         case 'clearChat':
             clearChatUI();
             break;
+        case 'systemNotice':
+            addSystemNotice(message.text);
+            break;
     }
 });
 
@@ -569,6 +572,15 @@ function addLoadingIndicator() {
 function removeLoadingIndicator() {
     const loader = document.getElementById('loading-indicator');
     if (loader) loader.remove();
+}
+
+function addSystemNotice(text) {
+    hideEmptyState();
+    const div = document.createElement('div');
+    div.className = 'system-notice';
+    div.textContent = text;
+    messagesContainer.appendChild(div);
+    scrollToBottom();
 }
 
 function updateLoadingStatus(text) {

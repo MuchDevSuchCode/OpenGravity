@@ -318,8 +318,78 @@ class OllamaViewProvider implements vscode.WebviewViewProvider {
         );
     }
 
+    private async _maybeSummarizeHistory(): Promise<void> {
+        // Need at least system + 3 user/assistant pairs before summarizing
+        if (this._chatHistory.length < 7) { return; }
+
+        const config = vscode.workspace.getConfiguration('opengravity');
+        const contextLength = config.get<number>('contextLength', 16384);
+        // ~3 chars per token; trigger when conversation turns exceed 50% of context budget
+        const charThreshold = contextLength * 3 * 0.5;
+
+        // Measure only the conversation turns — system message (index 0) is rebuilt each request
+        const turnChars = this._chatHistory
+            .slice(1)
+            .reduce((sum, m) => sum + (typeof m.content === 'string' ? m.content.length : 0), 0);
+
+        if (turnChars < charThreshold) { return; }
+
+        // Preserve system message + last 4 messages (most recent 2 exchanges)
+        const systemMsg = this._chatHistory[0];
+        const tail = this._chatHistory.slice(-4);
+        const toSummarize = this._chatHistory.slice(1, this._chatHistory.length - 4);
+
+        if (toSummarize.length < 2) { return; }
+
+        this._view?.webview.postMessage({ command: 'toolStatus', text: 'Summarizing conversation history...' });
+
+        try {
+            const conversationText = toSummarize
+                .filter(m => m.role === 'user' || m.role === 'assistant')
+                .map(m => `[${m.role.toUpperCase()}]: ${(typeof m.content === 'string' ? m.content : '').slice(0, 3000)}`)
+                .join('\n\n');
+
+            const summaryMessages = [
+                {
+                    role: 'system',
+                    content: 'Summarize the conversation below into one concise paragraph. Preserve all technical decisions, file paths, code changes, and task context. Be specific and factual. Output only the summary with no preamble.'
+                },
+                {
+                    role: 'user',
+                    content: conversationText
+                }
+            ];
+
+            const result = await this._ollamaService.complete(summaryMessages);
+            const summary = result.text?.trim();
+
+            if (summary) {
+                this._chatHistory = [
+                    systemMsg,
+                    {
+                        role: 'user',
+                        content: `[Earlier conversation summary]\n${summary}`
+                    },
+                    {
+                        role: 'assistant',
+                        content: 'Understood, I have context from our earlier conversation.'
+                    },
+                    ...tail
+                ];
+                this._view?.webview.postMessage({
+                    command: 'systemNotice',
+                    text: 'Conversation history was summarized to stay within the context window.'
+                });
+            }
+        } catch (e) {
+            // Fail silently — continue with full history rather than losing work
+            console.error('OpenGravity: history summarization failed:', e);
+        }
+    }
+
     private async _handleChat(text: string, images: string[], overrideModel?: string, thinkingLevel?: string, chatMode?: string, attachments: { name: string, mimeType?: string, content?: string }[] = []) {
         try {
+            await this._maybeSummarizeHistory();
             const contextMsg = await this._buildContextMessage();
             const config = vscode.workspace.getConfiguration('opengravity');
             const customSystemPrompt = config.get<string>('systemPrompt', '');
